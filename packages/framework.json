@@ -1,0 +1,11 @@
+{
+  "id": "umicom-framework",
+  "required_by": [
+    "desktop",
+    "developer",
+    "server"
+  ],
+  "omit_from": [
+    "recovery"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "id": "umicom-os-recovery",
+  "framework": false,
+  "desktop": false,
+  "purpose": "boot and repair without Framework"
+}

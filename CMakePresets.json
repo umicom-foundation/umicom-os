@@ -1,0 +1,60 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "headless-debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/headless-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "UMICOM_OS_GUI": "OFF",
+        "UMICOM_OS_BUILD_TESTS": "ON",
+        "UMICOM_BUILD_NATIVE_TOOL": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "gtk4-debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/gtk4-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "UMICOM_OS_GUI": "ON",
+        "UMICOM_OS_BUILD_TESTS": "ON",
+        "UMICOM_BUILD_NATIVE_TOOL": "OFF",
+        "BUILD_TESTING": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "headless-debug",
+      "configurePreset": "headless-debug"
+    },
+    {
+      "name": "gtk4-debug",
+      "configurePreset": "gtk4-debug"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "headless-debug",
+      "configurePreset": "headless-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gtk4-debug",
+      "configurePreset": "gtk4-debug",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

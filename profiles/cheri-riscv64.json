@@ -1,0 +1,6 @@
+{
+  "id": "umicom-os-cheri-riscv64",
+  "framework": true,
+  "arch": "cheri-riscv64",
+  "status": "experimental"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "umicom.application/1",
+  "id": "umicom.os",
+  "framework_required": true,
+  "frontends": [
+    "headless",
+    "desktop"
+  ],
+  "desktop_adapter": "gtk4"
+}

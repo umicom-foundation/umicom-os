@@ -1,0 +1,6 @@
+{
+  "id": "umicom-os-riscv64",
+  "framework": true,
+  "arch": "riscv64",
+  "status": "planned"
+}

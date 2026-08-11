@@ -1,0 +1,17 @@
+{
+  "schema": "umicom.os/1",
+  "id": "umicom.os",
+  "framework_dependency": "user-space",
+  "kernel_framework_dependency": false,
+  "desktop_adapter": "gtk4",
+  "frontends": [
+    "desktop",
+    "web-admin",
+    "headless"
+  ],
+  "architectures": [
+    "x86_64",
+    "riscv64",
+    "cheri-riscv64-experimental"
+  ]
+}

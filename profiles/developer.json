@@ -1,0 +1,12 @@
+{
+  "id": "umicom-os-developer",
+  "framework": true,
+  "desktop": true,
+  "studio": true,
+  "toolchains": [
+    "clang",
+    "gcc",
+    "riscv64",
+    "cheri-experimental"
+  ]
+}
