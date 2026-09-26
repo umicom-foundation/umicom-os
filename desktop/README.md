@@ -27,3 +27,16 @@ delegates packaging to Framework. It writes one new review directory, not an
 autostart entry. Its manifest detects changes, but is neither signed nor an
 execution authorisation token. Follow `docs/desk-system-centre.html` for the
 complete workflow and current limitations.
+
+## Primary native staging workflow
+
+The C23 `umicom-session-stage` executable is now the primary way to preview,
+stage and verify a launcher. Build it through `tools/native-launcher` and follow
+[the native launcher lesson](../docs/native-launcher-delivery.html). Its primary
+tests are also C. No interpreter is required by this new workflow.
+
+The Python command documented above is intentionally retained unchanged as an
+alternative. Native verification understands its established manifest schema,
+with additional path, inventory and desktop-entry checks. The separate OS image
+builder is not migrated by this update. Framework remains the implementation
+owner; this repository supplies only build composition and public instructions.
