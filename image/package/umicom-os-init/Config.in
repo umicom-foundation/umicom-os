@@ -1,0 +1,6 @@
+config BR2_PACKAGE_UMICOM_OS_INIT
+    bool "Umicom independent boot and recovery"
+    depends on BR2_USE_MMU
+    help
+      Minimal PID 1 and a read-only recovery console. No Framework or GTK
+      dependency. It never formats or mounts a persistent data device.

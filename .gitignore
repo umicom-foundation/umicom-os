@@ -8,3 +8,8 @@ CMakeFiles/
 cmake-build-*/
 # Node (if web assets later)
 /node_modules/
+
+# Host-side image tooling produces Python caches, never source changes.
+__pycache__/
+*.py[cod]
+.venv/

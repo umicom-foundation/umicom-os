@@ -1,0 +1,8 @@
+# Linux guest configuration is a byte protocol; keep line endings stable.
+# Sammy Hegab, Umicom Foundation. Licence: MIT.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.xz binary

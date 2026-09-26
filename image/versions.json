@@ -1,0 +1,12 @@
+{
+  "buildroot_tag": "2025.02.18",
+  "buildroot_commit": "d030e36bbc9669230c015be971b14b6e062cfdde",
+  "buildroot_url": "https://github.com/buildroot/buildroot.git",
+  "linux": "6.12.109",
+  "linux_archive_sha256": "5484e552a334e15019f4aeba89e5b58f04651cf2f4e24e04de9f152f1c38e3fa",
+  "firmware": "QEMU packaged OpenSBI via -bios default (RISC-V only)",
+  "profiles": [
+    "riscv64",
+    "x86_64"
+  ]
+}

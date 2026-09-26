@@ -1,0 +1,9 @@
+[
+  "include/umicom/base/status.h",
+  "include/umicom/data/data_server.h",
+  "include/umicom/platform/boot_report.h",
+  "src/data/data_server.c",
+  "src/platform/boot_report.c",
+  "examples/os_foundation/probe.c",
+  "examples/os_foundation/LICENSE"
+]

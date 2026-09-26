@@ -1,0 +1,6 @@
+config BR2_PACKAGE_UMICOM_FRAMEWORK_PROBE
+    bool "Umicom Framework normal user-space probe"
+    depends on BR2_USE_MMU
+    help
+      Packages actual canonical Framework source captured by os_image.py.
+      This normal workload can fail without disabling minimal recovery.

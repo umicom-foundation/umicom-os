@@ -1,0 +1,5 @@
+NAME="Umicom OS Foundation"
+ID=umicom
+PRETTY_NAME="Umicom OS Foundation - diskless development profile"
+VERSION_ID="0.1"
+BUILD_ID="foundation"
