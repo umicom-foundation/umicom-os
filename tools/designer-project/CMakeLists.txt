@@ -1,0 +1,10 @@
+# Umicom OS | Sammy Hegab, Umicom Foundation | MIT
+cmake_minimum_required(VERSION 3.24)
+project(UmicomOsDesignerProject LANGUAGES C)
+include(CTest)
+get_filename_component(_default_framework "${CMAKE_CURRENT_LIST_DIR}/../../framework" ABSOLUTE)
+set(UMICOM_OS_FRAMEWORK_SOURCE "${_default_framework}" CACHE PATH "Canonical Framework source checkout")
+if(NOT EXISTS "${UMICOM_OS_FRAMEWORK_SOURCE}/examples/designer_native/CMakeLists.txt")
+    message(FATAL_ERROR "Select the Framework checkout containing native designer tools.")
+endif()
+add_subdirectory("${UMICOM_OS_FRAMEWORK_SOURCE}/examples/designer_native" "${CMAKE_BINARY_DIR}/framework-designer-native")
