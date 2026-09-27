@@ -68,3 +68,12 @@ steps. Native component tests and archive integrity checks do not prove that
 a kernel boots. See [architecture and validation boundaries](docs/foundation/architecture.md).
 Use the new standalone host test project, not the earlier root-level preset,
 to test this boot layer independently of the legacy user-space composition.
+
+## Native image workflow
+
+The primary host image workflow is now the C23 `umicom-os-image` tool.
+Build it through `tools/os-image` and read
+[Build and check Umicom OS](docs/foundation/native-image-workflow.md).
+The existing `tools/os_image.py` is retained unchanged as an alternative.
+Native source snapshots and image metadata use their own strict `.umi` format;
+archives describe the same diskless guest. A verified archive is not a boot pass.
