@@ -1,0 +1,10 @@
+# Umicom Foundation | Sammy Hegab | MIT
+cmake_minimum_required(VERSION 3.24)
+project(UmicomOSBuildReview LANGUAGES C)
+include(CTest)
+set(UMICOM_OS_FRAMEWORK_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../../../Umicom-Applications/framework" CACHE PATH "Canonical Framework checkout")
+if(NOT EXISTS "${UMICOM_OS_FRAMEWORK_SOURCE}/examples/build_review/CMakeLists.txt")
+    message(FATAL_ERROR "Set UMICOM_OS_FRAMEWORK_SOURCE to the reviewed Framework checkout")
+endif()
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_subdirectory("${UMICOM_OS_FRAMEWORK_SOURCE}/examples/build_review" "${CMAKE_BINARY_DIR}/framework-review")
