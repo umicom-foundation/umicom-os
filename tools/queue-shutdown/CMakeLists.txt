@@ -1,0 +1,11 @@
+# Umicom Foundation | Sammy Hegab | MIT
+cmake_minimum_required(VERSION 3.24)
+project(UmicomQueueShutdownHost LANGUAGES C)
+get_filename_component(_default "${CMAKE_CURRENT_LIST_DIR}/../../framework" ABSOLUTE)
+set(UMICOM_OS_FRAMEWORK_SOURCE "${_default}" CACHE PATH "Canonical Framework source")
+set(UMICOM_FRAMEWORK_SOURCE "${UMICOM_OS_FRAMEWORK_SOURCE}" CACHE PATH "Canonical Framework source" FORCE)
+if(NOT EXISTS "${UMICOM_FRAMEWORK_SOURCE}/examples/queue_shutdown/CMakeLists.txt")
+    message(FATAL_ERROR "Merge the queue-shutdown Framework batch first")
+endif()
+include(CTest)
+add_subdirectory("${UMICOM_FRAMEWORK_SOURCE}/examples/queue_shutdown" framework-laboratory)
