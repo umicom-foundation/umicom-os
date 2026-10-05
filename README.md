@@ -77,3 +77,5 @@ Build it through `tools/os-image` and read
 The existing `tools/os_image.py` is retained unchanged as an alternative.
 Native source snapshots and image metadata use their own strict `.umi` format;
 archives describe the same diskless guest. A verified archive is not a boot pass.
+
+The user-space GTK desktop composes Framework’s branded titlebar and searchable application catalogue. Its native launch activity shows process starts and exits; this is separate from bootable-image readiness. See [Opening applications and checking launch activity](framework/docs/learning/application-launch-activity.html).

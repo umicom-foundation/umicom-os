@@ -16,10 +16,15 @@
  * the matching source file.
  */
 #include <gtk/gtk.h>
+#include "umicom/os/desktop_shell.h"
 
 #include "umicom/ui/components/component.h"
 #include "umicom/ui/gtk4/component_factory.h"
 
+/* The original component-only welcome window is retained for comparison.
+ * The shared desktop composition below now exposes Framework's existing
+ * notes, checkpoints and system tools without duplicating their ownership. */
+#if 0
 static GtkWidget *create_component(UmiUiComponentKind kind,
                                    const char *id,
                                    const char *text)
@@ -59,6 +64,23 @@ static void activate(GtkApplication *application, void *user_data)
     gtk_box_append(GTK_BOX(root), welcome);
     gtk_window_set_child(GTK_WINDOW(window), root);
     gtk_window_present(GTK_WINDOW(window));
+}
+
+#endif
+
+/* Repeated application activation focuses the existing shell. Child tools
+ * keep their own Framework lifetimes and can remain open independently. */
+static void activate(GtkApplication *application, void *user_data)
+{
+    (void)user_data;
+    for (GList *item = gtk_application_get_windows(application); item != NULL; item = item->next) {
+        GtkWindow *window = item->data;
+        if (g_strcmp0(gtk_widget_get_name(GTK_WIDGET(window)), "umicom-os-main") == 0) {
+            gtk_window_present(window); return;
+        }
+    }
+    GtkWindow *window = umi_os_desktop_shell_create(application);
+    if (window != NULL) gtk_window_present(window);
 }
 
 int main(int argc, char **argv)

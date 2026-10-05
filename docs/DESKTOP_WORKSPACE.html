@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Use the Umicom OS desktop workspace</title><style>
+body{font:17px/1.6 system-ui,sans-serif;max-width:850px;margin:48px auto;padding:0 24px;color:#17293a;background:#fafcfe}
+h1,h2{line-height:1.2}code{background:#eaf0f5;padding:2px 5px}li{margin:.7em 0}aside{border-left:4px solid #167a85;padding:12px 18px;background:#eef9fa}
+</style></head><body><main><h1>Use the Umicom OS desktop workspace</h1>
+<p>The user-space desktop gives access to Framework's recoverable notes workspace and read-only System Centre. It runs within your current operating system.</p>
+<h2>Keep notes and checkpoints</h2><ol><li>Launch the Umicom OS desktop shell.</li><li>Choose <strong>Open persistent desktop workspace</strong>. The new window shows the workspace directory.</li><li>Choose <strong>Open workspace</strong> to open storage. If storage is unavailable, the window reports the failure; it does not silently substitute a temporary memory store.</li><li>Create or edit a note. Changes remain in the draft until you choose <strong>Save checkpoint</strong>.</li><li>To inspect an earlier saved state, enter a retained checkpoint number and choose <strong>Preview checkpoint</strong>. Follow the review controls before restoring it.</li></ol>
+<p>Restoring a checkpoint creates a new revision. It does not undo external file changes or application transactions. Keep your usual backups; the workspace retains a bounded history.</p>
+<h2>Inspect system information</h2><ol><li>Choose <strong>Open System Centre</strong>.</li><li>Choose <strong>Refresh</strong> to request a new snapshot.</li><li>Read the overview, processes, network and boot observations. Refresh again when you need newer information.</li></ol>
+<aside>Opening the desktop does not automatically open storage or collect a system snapshot. These tools do not install an operating system, alter boot settings or replace your current desktop session.</aside>
+<h2>If something is unavailable</h2><p>Keep the error message and check that the Framework GTK components and SQLite adapter were included in your build. If another process owns the workspace, close that workspace normally before reopening it. Do not delete lock files to bypass a running owner.</p>
+</main><footer><p>Sammy Hegab · Umicom Foundation · MIT</p></footer></body></html>

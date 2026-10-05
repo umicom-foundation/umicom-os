@@ -39,3 +39,40 @@ Use the public beginner guide at
 disabled while the separate media writer remains unqualified.
 
 Sammy Hegab · Umicom Foundation · MIT
+
+## Review a checkpoint from the OS shell
+
+The Umicom OS desktop shell also exposes **Open persistent desktop workspace**.
+It uses Framework's shared workspace service. Opening its window does not open
+the database; **Open workspace** is the separate action that opens storage.
+
+1. Open the workspace, write a note and choose **Save checkpoint**.
+2. Change the note or appearance and save again. Note the saved revision number.
+3. Save or discard any remaining draft, enter an earlier retained checkpoint
+   number and choose **Preview checkpoint**.
+4. Compare the complete saved notes and preferences on the left and right.
+   The right pane is the content that would be restored. Both panes are
+   read-only and support selection and copying.
+5. Choose **Cancel** to leave the current saved workspace unchanged, or
+   **Restore reviewed checkpoint** to save the reviewed content as a new
+   revision. Check the result reported in the workspace window.
+
+The review includes note titles and bodies, the selected note, theme, font size
+and note-list visibility. Difference navigation is available within the shared
+text viewer's alignment limits. Larger content remains visible in full.
+
+If the saved workspace advances or an unsaved draft appears, dismiss the old
+review and prepare another. If a checkpoint is no longer among the eight
+retained revisions, choose a retained one. A storage failure leaves the last
+successfully saved workspace in place. This operation restores this notebook
+and its appearance; it does not roll back the operating system or a product's
+business transactions.
+
+## Find a retained checkpoint
+
+1. Open the persistent workspace. Its checkpoint list shows the newest retained revisions first, with note counts and the selected note title.
+2. Select a usable row to fill the checkpoint number. Selecting does not restore it. The manual number field remains available.
+3. Save or discard an unsaved draft, then choose **Preview checkpoint**. Read the complete comparison before choosing **Restore reviewed checkpoint**.
+4. Use **Refresh checkpoints** to reread the list without discarding editor text. An unavailable row remains visible; another retained checkpoint may still be usable.
+
+Restoration creates a new saved revision. Framework owns the history reader, worker and restore review; the OS shell supplies the entry point. For the full workflow and troubleshooting, read [Review and restore saved workspaces](../../framework/docs/learning/restore-saved-workspaces.html).
