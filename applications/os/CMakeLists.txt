@@ -58,3 +58,36 @@ if(UMICOM_OS_BUILD_TESTS)
         add_test(NAME os.${TEST_NAME} COMMAND umicom-os-test-${TEST_NAME})
     endforeach()
 endif()
+
+# The parent installs Framework separately. Register the OS programs as their
+# own component so an installation includes the product a user can launch.
+# Future OS executables should join this component rather than relying on a
+# Framework SDK installation to discover application-owned targets.
+include(GNUInstallDirs)
+install(TARGETS umicom-os
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT UmicomOS)
+if(TARGET umicom-os-shell)
+    install(TARGETS umicom-os-shell
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" COMPONENT UmicomOS)
+endif()
+
+if(UMICOM_OS_BUILD_TESTS)
+    # Qualify installation in a build-owned staging directory. The fixture
+    # verifies byte identity without launching a desktop during CTest.
+    set(_umicom_os_install_shell "")
+    if(TARGET umicom-os-shell)
+        set(_umicom_os_install_shell "$<TARGET_FILE:umicom-os-shell>")
+    endif()
+    add_test(NAME os.install.programs
+        COMMAND "${CMAKE_COMMAND}"
+            "-DUMICOM_INSTALL_BINARY_DIR=${CMAKE_BINARY_DIR}"
+            "-DUMICOM_INSTALL_TEST_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/install-check/$<CONFIG>"
+            "-DUMICOM_INSTALL_CONFIG=$<CONFIG>"
+            "-DUMICOM_INSTALL_BINDIR=${CMAKE_INSTALL_BINDIR}"
+            "-DUMICOM_INSTALL_CONSOLE=$<TARGET_FILE:umicom-os>"
+            "-DUMICOM_INSTALL_SHELL=${_umicom_os_install_shell}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_install.cmake")
+    set_tests_properties(os.install.programs PROPERTIES
+        TIMEOUT 60 LABELS "os;installation;regression")
+    unset(_umicom_os_install_shell)
+endif()
