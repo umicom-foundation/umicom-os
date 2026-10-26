@@ -3,8 +3,8 @@ CC ?= cc
 CFLAGS ?= -O2
 WARNINGS = -std=c23 -Wall -Wextra -Wpedantic -Wconversion -Wshadow
 all: umicom-os-init umicom-platform-check
-umicom-os-init: init.c config.c supervisor.c report.c console.c boot.h
-	$(CC) $(CFLAGS) $(WARNINGS) init.c config.c supervisor.c report.c console.c $(LDFLAGS) -o $@
-umicom-platform-check: platform_check.c
-	$(CC) $(CFLAGS) $(WARNINGS) platform_check.c $(LDFLAGS) -o $@
+umicom-os-init: init.c config.c admission.c supervisor.c report.c console.c boot.h boot_diagnostic.h boot_admission.h
+	$(CC) $(CFLAGS) $(WARNINGS) init.c config.c admission.c supervisor.c report.c console.c $(LDFLAGS) -o $@
+umicom-platform-check: platform_check.c guest_environment.c guest_environment.h boot.h
+	$(CC) $(CFLAGS) $(WARNINGS) platform_check.c guest_environment.c $(LDFLAGS) -o $@
 .PHONY: all

@@ -6,13 +6,15 @@
  *   Validate the complete service graph before any executable is started.
  *
  * AUTHOR AND ORGANISATION:
- *   Sammy Hegab
- *   Umicom Foundation
+ * Sammy Hegab
+ * Umicom Foundation
  *
- * LICENCE: MIT
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
 
 #include "boot.h"
+#include "boot_diagnostic.h"
 #include <string.h>
 
 static bool Token(const char *text, size_t length, char *out, size_t capacity)
@@ -94,6 +96,10 @@ static bool Order(UmiOsBootConfig *config)
     }
     return true;
 }
+/* The boolean-only parser is retained for engineering comparison. The detailed
+ * parser below reuses Token, Service and Order and publishes the same accepted
+ * state, while the old public entry point remains a compatibility wrapper. */
+#if 0
 bool UmiOsBootConfigParse(const char *data, size_t size, UmiOsBootConfig *out)
 {
     static const char magic[] = "UMICOM_OS_BOOT 1\n";
@@ -122,6 +128,83 @@ bool UmiOsBootConfigParse(const char *data, size_t size, UmiOsBootConfig *out)
     *out = config;
     return true;
 }
+#endif
+
+static bool Problem(UmiOsBootDiagnostic *diagnostic, UmiOsBootProblem problem, size_t line)
+{
+    if (diagnostic) {
+        diagnostic->problem = problem;
+        diagnostic->line = line;
+    }
+    return false;
+}
+const char *UmiOsBootProblemText(UmiOsBootProblem problem)
+{
+    switch (problem) {
+    case UMI_OS_BOOT_PROBLEM_NONE: return "Configuration accepted";
+    case UMI_OS_BOOT_PROBLEM_ARGUMENT: return "Missing input or output storage";
+    case UMI_OS_BOOT_PROBLEM_FORMAT: return "Check the size, version header and final newline";
+    case UMI_OS_BOOT_PROBLEM_CHARACTER: return "Only printable ASCII and newline are accepted";
+    case UMI_OS_BOOT_PROBLEM_HOSTNAME: return "Hostname is invalid or declared more than once";
+    case UMI_OS_BOOT_PROBLEM_SERVICE: return "Check the service identifier, path, dependency and timeout";
+    case UMI_OS_BOOT_PROBLEM_CAPACITY: return "Too many services";
+    case UMI_OS_BOOT_PROBLEM_FIELD: return "Unknown or empty configuration field";
+    case UMI_OS_BOOT_PROBLEM_REQUIRED: return "A hostname and at least one service are required";
+    case UMI_OS_BOOT_PROBLEM_GRAPH: return "Duplicate service, missing prerequisite or dependency cycle";
+    default: return "Unknown configuration problem";
+    }
+}
+bool UmiOsBootConfigParseDetailed(const char *data, size_t size,
+    UmiOsBootConfig *out, UmiOsBootDiagnostic *diagnostic)
+{
+    static const char magic[] = "UMICOM_OS_BOOT 1\n";
+    size_t cursor = sizeof magic - 1U;
+    if (!data || !out) return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_ARGUMENT, 0);
+    if (size < cursor || size > UMI_OS_CONFIG_MAX ||
+        memcmp(data, magic, cursor) || data[size - 1U] != '\n')
+        return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_FORMAT, 0);
+    size_t number = 1U;
+    for (size_t i = 0; i < size; ++i) {
+        unsigned char ch = (unsigned char)data[i];
+        if ((ch < 32U && ch != '\n') || ch > 126U)
+            return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_CHARACTER, number);
+        if (ch == '\n') ++number;
+    }
+    UmiOsBootConfig config = {0};
+    number = 2U;
+    while (cursor < size) {
+        size_t end = cursor;
+        while (end < size && data[end] != '\n') ++end;
+        size_t length = end - cursor;
+        const char *line = data + cursor;
+        if (length != 0U && line[0] != '#') {
+            if (length > 9U && !memcmp(line, "hostname=", 9U)) {
+                if (config.hostname[0] || !Token(line + 9U, length - 9U,
+                    config.hostname, sizeof config.hostname))
+                    return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_HOSTNAME, number);
+            } else if (length > 8U && !memcmp(line, "service=", 8U)) {
+                if (config.count == UMI_OS_SERVICE_MAX)
+                    return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_CAPACITY, number);
+                if (!Service(line + 8U, length - 8U, &config.services[config.count]))
+                    return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_SERVICE, number);
+                ++config.count;
+            } else return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_FIELD, number);
+        }
+        cursor = end + 1U;
+        ++number;
+    }
+    if (!config.hostname[0] || !config.count)
+        return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_REQUIRED, 0);
+    if (!Order(&config)) return Problem(diagnostic, UMI_OS_BOOT_PROBLEM_GRAPH, 0);
+    *out = config;
+    (void)Problem(diagnostic, UMI_OS_BOOT_PROBLEM_NONE, 0);
+    return true;
+}
+bool UmiOsBootConfigParse(const char *data, size_t size, UmiOsBootConfig *out)
+{
+    return UmiOsBootConfigParseDetailed(data, size, out, NULL);
+}
+
 bool UmiOsBootOptionsParse(const char *data, size_t size, UmiOsBootOptions *out)
 {
     UmiOsBootOptions result = {0}; unsigned seen = 0; size_t cursor = 0;

@@ -12,10 +12,16 @@ file	framework/src/platform/boot_report.c
 file	umicomOS/boot/foundation/CMakeLists.txt
 file	umicomOS/boot/foundation/LICENSE
 file	umicomOS/boot/foundation/Makefile
+file	umicomOS/boot/foundation/admission.c
 file	umicomOS/boot/foundation/boot.h
+file	umicomOS/boot/foundation/boot_admission.h
+file	umicomOS/boot/foundation/boot_diagnostic.h
 file	umicomOS/boot/foundation/config.c
 file	umicomOS/boot/foundation/console.c
+file	umicomOS/boot/foundation/guest_environment.c
+file	umicomOS/boot/foundation/guest_environment.h
 file	umicomOS/boot/foundation/init.c
+file	umicomOS/boot/foundation/plan.c
 file	umicomOS/boot/foundation/platform_check.c
 file	umicomOS/boot/foundation/report.c
 file	umicomOS/boot/foundation/supervisor.c

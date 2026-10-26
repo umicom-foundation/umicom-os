@@ -1,12 +1,112 @@
-name: Build
-on: [push, pull_request]
+name: OS qualification
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
 jobs:
   headless:
-    runs-on: ubuntu-latest
+    name: OS user-space contracts
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with: { submodules: recursive }
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build
-      - run: cmake --preset headless-debug
-      - run: cmake --build --preset headless-debug
-      - run: ctest --preset headless-debug
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Prepare evidence and host tools
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/evidence
+          git rev-parse HEAD > build/evidence/os-revision.txt
+          git submodule status --recursive > build/evidence/submodules.txt
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+          cmake --version > build/evidence/tools.txt
+          cc --version >> build/evidence/tools.txt
+      - name: Configure user space
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --preset headless-debug 2>&1 | tee build/evidence/configure.log
+      - name: Build user space
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build --preset headless-debug --parallel 2 2>&1 | tee build/evidence/build.log
+      - name: Test user space
+        run: ctest --preset headless-debug --no-tests=error --output-on-failure --output-log "$PWD/build/evidence/tests.log" --output-junit "$PWD/build/evidence/tests.xml"
+      - name: Preserve user-space results on every outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-user-space-evidence
+          path: |
+            build/evidence
+            build/headless-debug/Testing/Temporary
+            build/headless-debug/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: error
+
+  foundation:
+    name: Independent PID1 and recovery contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Prepare evidence and host tools
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/foundation-evidence
+          git rev-parse HEAD > build/foundation-evidence/os-revision.txt
+          git -C framework rev-parse HEAD > build/foundation-evidence/framework-revision.txt
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3
+          cmake --version > build/foundation-evidence/tools.txt
+          cc --version >> build/foundation-evidence/tools.txt
+      - name: Configure foundation independently
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake -S boot/foundation -B build/foundation -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DUMICOM_OS_FRAMEWORK_SOURCE="$PWD/framework" 2>&1 | tee build/foundation-evidence/configure.log
+      - name: Build foundation
+        shell: bash
+        run: |
+          set -o pipefail
+          cmake --build build/foundation --parallel 2 2>&1 | tee build/foundation-evidence/build.log
+      - name: Test unprivileged foundation contracts
+        run: ctest --test-dir build/foundation --no-tests=error --output-on-failure -E '^os[.]foundation[.]supervisor[.]identity$' --output-log "$PWD/build/foundation-evidence/tests.log" --output-junit "$PWD/build/foundation-evidence/tests.xml"
+      - name: Check the isolated identity transition
+        # This existing test creates a private chroot. It never changes host
+        # /run or user records. A refusal (including exit 77) fails this step;
+        # it must not be advertised as successful identity coverage.
+        shell: bash
+        run: |
+          set -o pipefail
+          sudo "$PWD/build/foundation/umicom-os-supervisor-tests" identity "$PWD/build/foundation/umicom-os-test-child" 2>&1 | tee build/foundation-evidence/identity.log
+      - name: Preserve foundation results on every outcome
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: os-foundation-evidence
+          path: |
+            build/foundation-evidence
+            build/foundation/Testing/Temporary
+            build/foundation/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: error
+
+# Previous single-job workflow retained for engineering review. Separate jobs
+# now expose independent boot-foundation failures and retain their evidence.
+# name: Build
+# on: [push, pull_request]
+# jobs:
+#   headless:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#         with: { submodules: recursive }
+#       - run: sudo apt-get update && sudo apt-get install -y ninja-build
+#       - run: cmake --preset headless-debug
+#       - run: cmake --build --preset headless-debug
+#       - run: ctest --preset headless-debug
+#

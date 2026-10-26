@@ -91,3 +91,15 @@ if(UMICOM_OS_BUILD_TESTS)
         TIMEOUT 60 LABELS "os;installation;regression")
     unset(_umicom_os_install_shell)
 endif()
+
+if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
+    foreach(_report_case IN ITEMS valid matching mismatch malformed relative unknown help unicode)
+        add_test(NAME "os.boot_report_cli.${_report_case}"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DPROGRAM=$<TARGET_FILE:umicom-os>"
+                "-DCASE=${_report_case}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/report-cli/${_report_case}/$<CONFIG>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_report.cmake")
+        set_tests_properties("os.boot_report_cli.${_report_case}" PROPERTIES TIMEOUT 15 LABELS "os;boot-report;cli")
+    endforeach()
+endif()

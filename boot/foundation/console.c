@@ -6,12 +6,12 @@
  *   Provide read-only recovery inspection without a shell or a Framework dependency.
  *
  * AUTHOR AND ORGANISATION:
- *   Sammy Hegab
- *   Umicom Foundation
+ * Sammy Hegab
+ * Umicom Foundation
  *
- * LICENCE: MIT
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
-
 #define _POSIX_C_SOURCE 200809L
 #include "boot.h"
 #include <errno.h>
@@ -38,9 +38,40 @@ static void Show(const char *path)
     }
     (void)close(fd); putchar('\n');
 }
+
+static void ShowServices(const UmiOsBootConfig *config)
+{
+    /* Display the accepted plan rather than infer service health from its
+     * presence. Runtime outcome remains in the boot report and service logs. */
+    if (!config || !config->count || config->count > UMI_OS_SERVICE_MAX) {
+        puts("No accepted service configuration is available.");
+        return;
+    }
+    puts("Configured service order (not a record of execution):");
+    for (size_t n = 0; n < config->count; ++n) {
+        size_t index = config->order[n];
+        if (index >= config->count) {
+            puts("The service order is invalid.");
+            return;
+        }
+        const UmiOsService *service = &config->services[index];
+        printf("%zu. %.31s | %.159s | after=%.31s | timeout=%u ms\n",
+            n + 1U, service->id, service->executable,
+            service->dependency[0] ? service->dependency : "-",
+            (unsigned)service->timeoutMs);
+    }
+    puts("Use status and log SERVICE to inspect outcomes from this boot.");
+}
+
 static void Command(const char *line, const UmiOsBootConfig *config)
 {
+    /* Retain the earlier command list for review; service-plan inspection is
+     * additive and does not authorize launch, restart or configuration edits. */
+#if 0
     if (strcmp(line, "help") == 0) puts("help | status | packages | log SERVICE | poweroff | reboot\nNo shell, disk installer, network or service restart is provided.");
+#endif
+    if (strcmp(line, "help") == 0) puts("help | status | services | packages | log SERVICE | poweroff | reboot\nNo shell, disk installer, network or service restart is provided.");
+    else if (strcmp(line, "services") == 0) ShowServices(config);
     else if (strcmp(line, "status") == 0) Show("/run/umicom/boot.report");
     else if (strcmp(line, "packages") == 0) Show("/usr/share/umicom/packages.json");
     else if (strcmp(line, "poweroff") == 0) UmiOsStopRequested = 1;

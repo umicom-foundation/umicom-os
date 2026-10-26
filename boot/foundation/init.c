@@ -6,14 +6,16 @@
  *   Bring up a diskless guest and retain independent recovery when a service fails.
  *
  * AUTHOR AND ORGANISATION:
- *   Sammy Hegab
- *   Umicom Foundation
+ * Sammy Hegab
+ * Umicom Foundation
  *
- * LICENCE: MIT
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
-
 #define _GNU_SOURCE
 #include "boot.h"
+#include "boot_admission.h"
+#include "boot_diagnostic.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -90,6 +92,10 @@ int main(void)
     }
     char text[UMI_OS_CONFIG_MAX + 1], source[UMI_OS_SOURCE_ID_SIZE] = {0}; size_t length = 0;
     UmiOsBootConfig config = {0}; UmiOsBootOptions options = {0};
+    /* Retain the original admission sequence for review. A requested recovery
+     * previously replaced a failed hostname operation with "requested"; the
+     * shared OS decision below preserves the failure and its protocol reason. */
+#if 0
     const char *reason = mounted ? "none" : "mount";
     bool optionsOk = ReadText("/proc/cmdline", text, sizeof text, &length) &&
         UmiOsBootOptionsParse(text, length, &options);
@@ -108,6 +114,42 @@ int main(void)
      * present. Configuration remains useful for reading known service logs. */
     if (options.recovery && mounted && configOk && sourceOk) reason = "requested";
     const char *state = strcmp(reason, "none") == 0 ? "starting" : "recovery";
+#endif
+
+    bool optionsOk = ReadText("/proc/cmdline", text, sizeof text, &length) &&
+        UmiOsBootOptionsParse(text, length, &options);
+    if (!optionsOk) fputs("UMICOM_CONFIGURATION kernel-controls-invalid\n", stderr);
+
+    UmiOsBootDiagnostic diagnostic = {UMI_OS_BOOT_PROBLEM_NONE, 0};
+    bool configRead = ReadText("/etc/umicom/boot.conf", text, sizeof text, &length);
+    bool configOk = configRead &&
+        UmiOsBootConfigParseDetailed(text, length, &config, &diagnostic);
+    if (!configRead) fputs("UMICOM_CONFIGURATION boot-plan-unreadable\n", stderr);
+    else if (!configOk) fprintf(stderr, "UMICOM_CONFIGURATION line=%zu %s\n",
+        diagnostic.line, UmiOsBootProblemText(diagnostic.problem));
+
+    bool sourceOk = ReadText("/etc/umicom/source-id", text, sizeof text, &length) &&
+        length == 65 && text[64] == '\n';
+    if (sourceOk) for (size_t i = 0; i < 64; ++i)
+        if (!((text[i] >= '0' && text[i] <= '9') ||
+            (text[i] >= 'a' && text[i] <= 'f'))) sourceOk = false;
+    if (sourceOk) memcpy(source, text, 64);
+    else {
+        memset(source, '0', 64);
+        fputs("UMICOM_CONFIGURATION source-identity-invalid\n", stderr);
+    }
+    bool hostnameOk = configOk && sethostname(config.hostname, strlen(config.hostname)) == 0;
+    if (configOk && !hostnameOk) fputs("UMICOM_CONFIGURATION hostname-not-applied\n", stderr);
+
+    UmiOsBootInputs inputs = {mounted, optionsOk, configOk, sourceOk,
+        hostnameOk, options, config.count};
+    /* The fallback keeps PID1 in recovery if a future caller violates the
+     * bounded admission contract. No ordinary service can start from it. */
+    UmiOsBootDecision decision = {"normal", "recovery", "configuration", 0, false};
+    (void)UmiOsBootDecide(&inputs, &decision);
+    const char *mode = decision.mode;
+    const char *reason = decision.reason;
+    const char *state = decision.state;
     size_t completed = 0;
     if (mounted && !UmiOsWriteReport("/run/umicom/boot.report", mode, state, config.count, completed, reason, source)) {
         reason = "report-write"; state = "recovery";
