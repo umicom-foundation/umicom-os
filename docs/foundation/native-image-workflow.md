@@ -20,3 +20,20 @@ ctest --test-dir "$BUILD" --parallel 2 --no-tests=error --output-on-failure
 The host tool is reusable Framework code. This repository owns the native profile inventory, existing Buildroot packages, kernel configuration, guest PID 1 and recovery policy. This entry point does not create another OS-only copy of those host services.
 
 Image preparation, kernel building, archive verification and normal/recovery guest tests are separate steps. Unit-test fixtures and a valid archive do not prove that the selected Linux kernel boots. BIOS/UEFI, installation to a physical disk and graphical desktop work remain separate qualification tasks.
+
+## Inspect the profile before preparation
+
+The native tool can read the declaration before creating a build workspace:
+
+```sh
+"$BUILD/bin/umicom-os-image" profile --file "$OS/image/native/profile.umi"
+```
+
+This prints the declared Buildroot commit, kernel version and archive digest,
+the sorted source inventory and a digest of the profile text. It does not
+download dependencies, execute recipes, check all listed source contents or
+establish licence approval. Preparation still captures and validates the actual
+inputs; a declaration digest and an input-manifest digest have different meanings.
+
+The public Framework API is in `umicom/os_image/profile.h`. Host applications
+can inspect the same grammar without duplicating the parser used by preparation.

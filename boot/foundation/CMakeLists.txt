@@ -175,3 +175,19 @@ if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
         target_compile_options(umicom-os-guest-environment-tests PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
     endif()
 endif()
+
+# Admission fixtures use real child processes only on the Linux host.
+if(BUILD_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING)
+    add_executable(umicom-os-supervisor-admission-tests
+        ../../tests/foundation/test_supervisor_admission.c)
+    target_link_libraries(umicom-os-supervisor-admission-tests PRIVATE umicom_os_supervisor)
+    target_compile_options(umicom-os-supervisor-admission-tests PRIVATE
+        -Wall -Wextra -Wpedantic -Wconversion -Wshadow)
+    foreach(_owner_case IN ITEMS ignored-child auto-reap readonly-log closed-log
+        closed-streams closed-streams-exec low-log caller-log)
+        add_test(NAME "os.foundation.supervisor_owner.${_owner_case}"
+            COMMAND umicom-os-supervisor-admission-tests "${_owner_case}"
+                "$<TARGET_FILE:umicom-os-test-child>")
+        set_tests_properties("os.foundation.supervisor_owner.${_owner_case}" PROPERTIES TIMEOUT 15)
+    endforeach()
+endif()

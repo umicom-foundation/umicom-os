@@ -4,14 +4,15 @@
  *
  * PURPOSE:
  *   Keep the minimal boot controller independent of Framework and GTK.
+ *   Declare service supervision and its explicit caller ownership contract.
  *
  * AUTHOR AND ORGANISATION:
- *   Sammy Hegab
- *   Umicom Foundation
+ * Sammy Hegab
+ * Umicom Foundation
  *
- * LICENCE: MIT
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
-
 #ifndef UMICOM_OS_FOUNDATION_BOOT_H
 #define UMICOM_OS_FOUNDATION_BOOT_H
 #include <stdbool.h>
@@ -60,6 +61,13 @@ bool UmiOsBootOptionsParse(const char *data, size_t size, UmiOsBootOptions *out)
 /* Caller serialises runs. Launches a single executable with no argument parsing
  * or shell. A private process group contains descendants. dropIdentity is true
  * in init and can be false only in the separate host test harness. */
+
+/* Launch ownership: the caller must keep its log descriptor valid and writable
+ * for the duration of this synchronous call, serialize signal-policy changes,
+ * and be the exclusive waiter for the launched child. SIGCHLD ignored or
+ * SA_NOCLDWAIT is rejected before fork. The supervisor uses its own log copy
+ * and preserves the caller descriptor, including when it is 0, 1 or 2.
+ * Lost wait ownership is reported as a launch failure, not successful cleanup. */
 UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool dropIdentity);
 const char *UmiOsServiceReason(UmiOsServiceState state);
 /* Privileged I/O is only used by the PID-1 executable, never by parser tests. */

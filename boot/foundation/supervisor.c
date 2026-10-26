@@ -4,14 +4,15 @@
  *
  * PURPOSE:
  *   Run a packaged one-shot service with a deadline and a private process group.
+ *   Keep launch descriptors separate from caller streams and retain child-wait ownership.
  *
  * AUTHOR AND ORGANISATION:
- *   Sammy Hegab
- *   Umicom Foundation
+ * Sammy Hegab
+ * Umicom Foundation
  *
- * LICENCE: MIT
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
-
 #define _POSIX_C_SOURCE 200809L
 #define _GNU_SOURCE
 #include "boot.h"
@@ -73,7 +74,13 @@ static void RunChild(const UmiOsService *service, int logFd, int errorFd, bool d
     if (dup2(logFd, STDOUT_FILENO) < 0 || dup2(logFd, STDERR_FILENO) < 0)
         ChildFail(errorFd, 1);
     int input = open("/dev/null", O_RDONLY | O_CLOEXEC);
+    /* Retain the prior redirect for review. When open returns descriptor 0,
+     * dup2(0, 0) leaves close-on-exec set; explicitly clear it for service stdin. */
+#if 0
     if (input < 0 || dup2(input, STDIN_FILENO) < 0) ChildFail(errorFd, 1);
+#endif
+    if (input < 0 || dup2(input, STDIN_FILENO) < 0 ||
+        fcntl(STDIN_FILENO, F_SETFD, 0) < 0) ChildFail(errorFd, 1);
     if (input > STDERR_FILENO) (void)close(input);
     long originalMaximum = sysconf(_SC_OPEN_MAX);
     if (originalMaximum < 0) ChildFail(errorFd, 1);
@@ -104,6 +111,43 @@ static void RunChild(const UmiOsService *service, int logFd, int errorFd, bool d
     execve(service->executable, arguments, environment);
     ChildFail(errorFd, 1);
 }
+
+/* Private launch descriptors stay above stdin/stdout/stderr. This prevents
+ * stream redirection from overwriting the close-on-exec error channel when a
+ * caller starts with one or more standard descriptors closed. */
+static bool OpenLaunchPipe(int descriptors[2])
+{
+    if (pipe2(descriptors, O_CLOEXEC | O_NONBLOCK) != 0) return false;
+    for (size_t i = 0; i < 2U; ++i) {
+        if (descriptors[i] >= 3) continue;
+        int owned = fcntl(descriptors[i], F_DUPFD_CLOEXEC, 3);
+        if (owned < 0) {
+            int saved = errno;
+            (void)close(descriptors[0]);
+            (void)close(descriptors[1]);
+            errno = saved;
+            return false;
+        }
+        (void)close(descriptors[i]);
+        descriptors[i] = owned;
+    }
+    return true;
+}
+static int OwnWritableLog(int descriptor)
+{
+    int flags = fcntl(descriptor, F_GETFL);
+    if (flags < 0) return -1;
+    if ((flags & O_ACCMODE) == O_RDONLY) {
+        errno = EBADF;
+        return -1;
+    }
+    return fcntl(descriptor, F_DUPFD_CLOEXEC, 3);
+}
+
+/* The prior launch path is retained for review. The active implementation
+ * owns private descriptors and requires exclusive child-wait ownership before
+ * launch, preserving error reporting and safe process-group cleanup. */
+#if 0
 UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool dropIdentity)
 {
     UmiOsServiceResult result = {UMI_OS_SERVICE_LAUNCH, -1, 0, EINVAL, 0};
@@ -141,6 +185,89 @@ UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool 
     (void)kill(pid, SIGKILL);
     pid_t waited;
     do { waited = waitpid(pid, &waitStatus, 0); } while (waited < 0 && errno == EINTR);
+    LaunchError error = {0};
+    char *bytes = (char *)&error; size_t have = 0;
+    while (have < sizeof error) {
+        ssize_t n = read(pipeFd[0], bytes + have, sizeof error - have);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        have += (size_t)n;
+    }
+    (void)close(pipeFd[0]);
+    uint64_t end = Now(); result.elapsedMs = end == UINT64_MAX ? 0U : end - start;
+    if (timedOut) result.state = UMI_OS_SERVICE_TIMEOUT;
+    else if (waitFailed || waited != pid || (have != 0 && have != sizeof error)) result.state = UMI_OS_SERVICE_LAUNCH;
+    else if (have == sizeof error) {
+        result.launchError = error.number;
+        result.state = error.stage == 2 ? UMI_OS_SERVICE_PRIVILEGE : UMI_OS_SERVICE_LAUNCH;
+    } else if (WIFEXITED(waitStatus) && WEXITSTATUS(waitStatus) == 0) result.state = UMI_OS_SERVICE_OK;
+    else result.state = UMI_OS_SERVICE_EXIT;
+    if (waited == pid) {
+        if (WIFEXITED(waitStatus)) result.exitCode = WEXITSTATUS(waitStatus);
+        if (WIFSIGNALED(waitStatus)) result.signalNumber = WTERMSIG(waitStatus);
+    }
+    return result;
+}
+#endif
+
+UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool dropIdentity)
+{
+    UmiOsServiceResult result = {UMI_OS_SERVICE_LAUNCH, -1, 0, EINVAL, 0};
+    int pipeFd[2]; int waitStatus = 0; uint64_t start;
+    if (!service || logFd < 0 || !memchr(service->executable, 0, sizeof service->executable) ||
+        service->executable[0] != '/' || service->timeoutMs < 100U || service->timeoutMs > 30000U)
+        return result;
+    /* This owner must retain its child until group cleanup. Reject automatic
+     * reaping instead of modifying the caller's signal disposition. The caller
+     * must also remain the exclusive waiter for this child during the run. */
+    struct sigaction childPolicy;
+    if (sigaction(SIGCHLD, NULL, &childPolicy) != 0) { result.launchError = errno; return result; }
+    if (childPolicy.sa_handler == SIG_IGN || (childPolicy.sa_flags & SA_NOCLDWAIT) != 0) {
+        result.launchError = EINVAL;
+        return result;
+    }
+    start = Now();
+    if (start == UINT64_MAX) { result.launchError = errno; return result; }
+    int ownedLog = OwnWritableLog(logFd);
+    if (ownedLog < 0) { result.launchError = errno; return result; }
+    if (!OpenLaunchPipe(pipeFd)) {
+        result.launchError = errno;
+        (void)close(ownedLog);
+        return result;
+    }
+    pid_t pid = fork();
+    if (pid == 0) { (void)close(pipeFd[0]); RunChild(service, ownedLog, pipeFd[1], dropIdentity); _exit(126); }
+    if (pid < 0) { result.launchError = errno; (void)close(ownedLog); (void)close(pipeFd[0]); (void)close(pipeFd[1]); return result; }
+    (void)close(ownedLog);
+    (void)close(pipeFd[1]);
+    (void)setpgid(pid, pid); /* The child checks its own result before exec. */
+    result.launchError = 0;
+    bool timedOut = false, waitFailed = false;
+    for (;;) {
+        siginfo_t information = {0};
+        if (waitid(P_PID, (id_t)pid, &information, WEXITED | WNOHANG | WNOWAIT) != 0) {
+            if (errno == EINTR) continue;
+            result.launchError = errno; waitFailed = true; break;
+        }
+        if (information.si_pid == pid) break;
+        uint64_t now = Now();
+        if (now == UINT64_MAX || now - start >= service->timeoutMs) { timedOut = true; break; }
+        struct timespec delay = {0, 10000000L};
+        while (nanosleep(&delay, &delay) != 0 && errno == EINTR) {}
+    }
+    /* Keep the direct child unreaped until its group is terminated. Its PID
+     * cannot be recycled into an unrelated process group during this cleanup.
+     * This contains ordinary descendants, not hostile setsid/fork behaviour;
+     * packaged services remain trusted, and this is not a code sandbox. */
+    pid_t waited = -1;
+    if (!waitFailed) {
+        (void)kill(-pid, SIGKILL);
+        (void)kill(pid, SIGKILL);
+        do { waited = waitpid(pid, &waitStatus, 0); } while (waited < 0 && errno == EINTR);
+    }
+    /* A failed wait no longer proves that this numeric PID is ours. Do not
+     * signal it, its group, or wait for a potentially unrelated process. This
+     * reports lost ownership; it is not a successful cleanup claim. */
     LaunchError error = {0};
     char *bytes = (char *)&error; size_t have = 0;
     while (have < sizeof error) {

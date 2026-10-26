@@ -45,5 +45,6 @@ int main(int argc,char **argv)
         if(!getcwd(current,sizeof current)||strcmp(current,"/run/umicom/work")!=0)return 5;
         return 0;
     }
+    if(strcmp(name,"stdin")==0){char byte;return read(STDIN_FILENO,&byte,1)==0?0:1;}
     puts("Child completed successfully.");return 0;
 }
