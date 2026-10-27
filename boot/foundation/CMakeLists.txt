@@ -191,3 +191,19 @@ if(BUILD_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPI
         set_tests_properties("os.foundation.supervisor_owner.${_owner_case}" PROPERTIES TIMEOUT 15)
     endforeach()
 endif()
+
+# Structured inspection uses the same unprivileged parser executable. These
+# checks do not invoke PID1, mount filesystems or start a configured service.
+if(BUILD_TESTING)
+    foreach(_json_case IN ITEMS normal recovery option-order poweroff cycle unsafe-path
+            duplicate-json duplicate-cmdline missing-value option-as-value unknown invalid-controls)
+        add_test(NAME "os.foundation.plan.json.${_json_case}"
+            COMMAND "${CMAKE_COMMAND}"
+                "-DPROGRAM=$<TARGET_FILE:umicom-os-boot-plan>"
+                "-DPLAN_CASE=${_json_case}"
+                "-DFIXTURES=${CMAKE_CURRENT_SOURCE_DIR}/../../tests/foundation/plans"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/foundation/check_plan_json.cmake")
+        set_tests_properties("os.foundation.plan.json.${_json_case}" PROPERTIES
+            TIMEOUT 15 LABELS "os;foundation;inspection;regression")
+    endforeach()
+endif()

@@ -104,3 +104,5 @@ Neither category substitutes for a normal and recovery guest boot.
 The platform check is for trusted packaged services in the minimal image.
 It is not an arbitrary-code sandbox, an image authentication mechanism or a
 claim that the whole operating system is production ready.
+
+For machine-readable host inspection, see [Inspect an Umicom OS boot plan](boot-plan-inspection.md). The JSON view separates configured and scheduled counts and never claims services were executed.
