@@ -93,7 +93,8 @@ if(UMICOM_OS_BUILD_TESTS)
 endif()
 
 if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
-    foreach(_report_case IN ITEMS valid matching mismatch malformed relative unknown help unicode)
+    foreach(_report_case IN ITEMS valid matching mismatch malformed relative unknown help unicode
+            crlf source-short source-uppercase source-empty)
         add_test(NAME "os.boot_report_cli.${_report_case}"
             COMMAND "${CMAKE_COMMAND}"
                 "-DPROGRAM=$<TARGET_FILE:umicom-os>"
