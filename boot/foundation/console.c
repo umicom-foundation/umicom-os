@@ -88,6 +88,7 @@ static void Command(const char *line, const UmiOsBootConfig *config)
 void UmiOsRecoveryConsole(const UmiOsBootConfig *config)
 {
     char line[96]; size_t used = 0; bool overflow = false, invalid = false;
+    bool afterCarriageReturn = false;
     puts("Umicom OS Foundation console. Type help.\nChanges in this RAM-only guest disappear at shutdown.");
     fputs("umicom> ", stdout); fflush(stdout);
     while (!UmiOsStopRequested) {
@@ -98,13 +99,27 @@ void UmiOsRecoveryConsole(const UmiOsBootConfig *config)
         if (ready <= 0) continue;
         char c; ssize_t n = read(STDIN_FILENO, &c, 1);
         if (n <= 0) { sleep(1); continue; }
+        /* Serial clients may send CRLF as one Enter key. Consume its LF once,
+         * without hiding the first byte of the next independent command. */
+        if (afterCarriageReturn && c == '\n') {
+            afterCarriageReturn = false;
+            continue;
+        }
+        afterCarriageReturn = false;
         if (c == '\n' || c == '\r') {
+            afterCarriageReturn = c == '\r';
             line[used] = 0;
             if (overflow) puts("Command too long; nothing was executed.");
             else if (invalid) puts("Command contains unsupported characters; nothing was executed.");
             else Command(line, config);
             used = 0; overflow = false; invalid = false;
             if (!UmiOsStopRequested) { fputs("umicom> ", stdout); fflush(stdout); }
+        } else if (c == '\b' || (unsigned char)c == 127U) {
+            /* Editing removes only an accepted printable byte. Once input was
+             * lost or rejected, keep the entire line poisoned through Enter;
+             * deleting bytes must never revive a truncated power command. The
+             * terminal owns echo, so this parser emits no cursor sequences. */
+            if (!overflow && !invalid && used != 0U) --used;
         } else if ((unsigned char)c >= 32U && (unsigned char)c <= 126U) {
             if (used + 1 < sizeof line && !overflow) line[used++] = c;
             else overflow = true;

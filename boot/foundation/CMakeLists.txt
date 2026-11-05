@@ -1,8 +1,19 @@
 #-----------------------------------------------------------------------------
-# Umicom OS | Sammy Hegab, Umicom Foundation | Licence: MIT
+# Umicom OS
+# File: boot/foundation/CMakeLists.txt
+#
+# PURPOSE:
+#   Build the recovery console and its unprivileged host regression drivers.
+#
+# AUTHOR AND ORGANISATION:
+# Sammy Hegab
+# Umicom Foundation
+#
+# LICENCE:
+# MIT
+#---------------------------------------------------------------------------
 # Build directly with -S boot/foundation. The existing root user-space build
 # and its Framework submodule are untouched; recovery has no such dependency.
-#-----------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.24)
 project(UmicomOsFoundation LANGUAGES C)
 set(CMAKE_C_STANDARD 23)
@@ -96,7 +107,8 @@ if(BUILD_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPI
     add_executable(umicom-os-console-driver ../../tests/foundation/console_driver.c console.c)
     target_link_libraries(umicom-os-console-driver PRIVATE umicom_os_boot_config)
     target_include_directories(umicom-os-console-driver PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-    foreach(_case IN ITEMS help unknown path long control escape reboot blank)
+    foreach(_case IN ITEMS help unknown path long control escape reboot blank
+            backspace delete empty-edit crlf overflow-edit invalid-edit)
         add_test(NAME "os.foundation.console.${_case}" COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_SOURCE_DIR}/../../tests/foundation/test_console.py"
             "$<TARGET_FILE:umicom-os-console-driver>" "${_case}")

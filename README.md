@@ -22,6 +22,10 @@ tests/                      OS-level tests
 
 ## First headless build
 
+Start with [Using Umicom OS and preparing a development environment](docs/foundation/installation-and-development.md)
+for the distinction between the host application and the Linux-based QEMU image,
+their build commands, recovery console, and current installation/account limits.
+
 ```powershell
 cmake --preset headless-debug
 cmake --build --preset headless-debug
