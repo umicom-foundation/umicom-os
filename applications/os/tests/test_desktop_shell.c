@@ -1,9 +1,16 @@
 /*-----------------------------------------------------------------------------
  * Umicom OS
  * File: applications/os/tests/test_desktop_shell.c
- * PURPOSE: Verify desktop composition without opening storage or collecting host data.
- * AUTHOR AND ORGANISATION: Sammy Hegab, Umicom Foundation
- * LICENCE: MIT
+ *
+ * PURPOSE:
+ *   Verify desktop composition without opening storage or collecting host data.
+ *
+ * AUTHOR AND ORGANISATION:
+ * Sammy Hegab
+ * Umicom Foundation
+ *
+ * LICENCE:
+ * MIT
  *---------------------------------------------------------------------------*/
 #include "umicom/os/desktop_shell.h"
 #include "umicom/test_runtime/check.h"
@@ -14,7 +21,9 @@
  * Inspect names rather than relying on a theme's intermediate widget layout. */
 static GtkWidget *find(GtkWidget *root, const char *name)
 {
-    if (strcmp(gtk_widget_get_name(root), name) == 0) return root;
+    const char *identity = g_object_get_data(G_OBJECT(root), "umicom-automation-id");
+    if (strcmp(gtk_widget_get_name(root), name) == 0 ||
+        (identity != NULL && strcmp(identity, name) == 0)) return root;
     for (GtkWidget *child = gtk_widget_get_first_child(root); child != NULL;
          child = gtk_widget_get_next_sibling(child)) {
         GtkWidget *match = find(child, name); if (match != NULL) return match;
@@ -59,6 +68,32 @@ int main(void)
         }
         g_object_unref(child);
     }
+
+    /* Activate the visible home action rather than calling its service directly.
+     * Before map there is no native popup surface; after map the same action
+     * must open the shared catalogue without starting another application. */
+    GtkWidget *browse = find(GTK_WIDGET(window), "desktop-open-applications");
+    GtkWidget *status = find(GTK_WIDGET(window), "desktop-application-status");
+    GtkWidget *guide = find(GTK_WIDGET(window), "desktop-recovery-guide");
+    GtkWidget *catalogue = find(titlebar, "workstation.application.catalogue");
+    UMI_TEST_REQUIRE(GTK_IS_BUTTON(browse) && GTK_IS_LABEL(status));
+    UMI_TEST_REQUIRE(GTK_IS_EXPANDER(guide) && !gtk_expander_get_expanded(GTK_EXPANDER(guide)));
+    UMI_TEST_REQUIRE(GTK_IS_MENU_BUTTON(catalogue));
+    g_signal_emit_by_name(browse, "clicked");
+    UMI_TEST_REQUIRE(strstr(gtk_label_get_text(GTK_LABEL(status)), "not ready") != NULL);
+    gtk_window_present(window);
+    gint64 deadline = g_get_monotonic_time() + 2 * G_TIME_SPAN_SECOND;
+    while (!gtk_widget_get_mapped(catalogue) && g_get_monotonic_time() < deadline) {
+        g_main_context_iteration(NULL, FALSE);
+        g_usleep(1000);
+    }
+    UMI_TEST_REQUIRE(gtk_widget_get_mapped(catalogue));
+    g_signal_emit_by_name(browse, "clicked");
+    GtkPopover *popover = gtk_menu_button_get_popover(GTK_MENU_BUTTON(catalogue));
+    UMI_TEST_REQUIRE(popover != NULL && gtk_widget_get_visible(GTK_WIDGET(popover)));
+    UMI_TEST_REQUIRE(strstr(gtk_label_get_text(GTK_LABEL(status)), "Open selected") != NULL);
+    UMI_TEST_REQUIRE(g_list_model_get_n_items(gtk_window_get_toplevels()) == 1U);
+    gtk_menu_button_popdown(GTK_MENU_BUTTON(catalogue));
     gtk_window_destroy(window);
     return EXIT_SUCCESS;
 }
