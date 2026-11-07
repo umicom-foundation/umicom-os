@@ -67,6 +67,7 @@ static int Usage(void)
 {
     fputs("Usage: umicom-os [--help]\n"
           "       umicom-os --boot-report ABSOLUTE_FILE [--source SHA256]\n"
+          "       umicom-os --compare-boot-reports EARLIER_ABSOLUTE_FILE LATER_ABSOLUTE_FILE\n"
           "Inspect a captured report. No guest, service or privileged operation is started.\n",
           stdout);
     return ferror(stdout) || fflush(stdout) ? 1 : 0;
@@ -89,8 +90,53 @@ static int InspectReport(const char *path, const char *source)
     puts("This file is an observation, not proof of current machine health or publisher identity.");
     return ferror(stdout) || fflush(stdout) ? 1 : 0;
 }
+
+/* Keep admission and comparison in Framework. This frontend formats observed
+ * fields without starting a guest or interpreting a difference as a repair. */
+static int CompareReports(const char *beforePath, const char *afterPath)
+{
+    UmiBootReport before, after;
+    UmiStatus status = UmiBootReportLoad(beforePath, NULL, &before);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot read earlier report (status=%d).\n", (int)status);
+        return 1;
+    }
+    status = UmiBootReportLoad(afterPath, NULL, &after);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot read later report (status=%d).\n", (int)status);
+        return 1;
+    }
+    uint32_t changes = 0U;
+    status = UmiBootReportCompare(&before, &after, &changes);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot compare reports (status=%d).\n", (int)status);
+        return 1;
+    }
+    puts("Captured boot report comparison");
+    if (changes == 0U) puts("No semantic fields changed.");
+    if (changes & UMI_BOOT_REPORT_CHANGED_MODE)
+        printf("mode: %s -> %s\n", before.mode == UMI_BOOT_REPORT_NORMAL ? "normal" : "recovery",
+            after.mode == UMI_BOOT_REPORT_NORMAL ? "normal" : "recovery");
+    if (changes & UMI_BOOT_REPORT_CHANGED_STATE)
+        printf("state: %s -> %s\n", UmiBootReportStateText(before.state), UmiBootReportStateText(after.state));
+    if (changes & UMI_BOOT_REPORT_CHANGED_PLANNED)
+        printf("planned: %" PRIu32 " -> %" PRIu32 "\n", before.planned, after.planned);
+    if (changes & UMI_BOOT_REPORT_CHANGED_COMPLETED)
+        printf("completed: %" PRIu32 " -> %" PRIu32 "\n", before.completed, after.completed);
+    if (changes & UMI_BOOT_REPORT_CHANGED_REASON)
+        printf("reason: %s -> %s\n", before.reason, after.reason);
+    if (changes & UMI_BOOT_REPORT_CHANGED_SOURCE) {
+        printf("source: %s -> %s\n", before.sourceId, after.sourceId);
+        puts("Source identities differ; review the boot plans before interpreting progress.");
+    }
+    puts("Reports are observations, not proof of current machine health or publisher identity.");
+    return ferror(stdout) || fflush(stdout) ? 1 : 0;
+}
+
 static int CommandMain(int argc, char **argv)
 {
+    if (argc == 4 && !strcmp(argv[1], "--compare-boot-reports"))
+        return CompareReports(argv[2], argv[3]);
     if (argc == 1) return RunStartup();
     if (argc == 2 && !strcmp(argv[1], "--help")) return Usage();
     if ((argc == 3 || argc == 5) && !strcmp(argv[1], "--boot-report")) {

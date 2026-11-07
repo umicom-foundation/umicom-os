@@ -104,3 +104,16 @@ if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
         set_tests_properties("os.boot_report_cli.${_report_case}" PROPERTIES TIMEOUT 15 LABELS "os;boot-report;cli")
     endforeach()
 endif()
+
+# Report comparison reuses Framework admission and never starts the OS shell.
+if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
+    foreach(_case IN ITEMS equal unicode progress source invalid-before invalid-after missing-argument)
+        add_test(NAME "os.boot_report_compare_cli.${_case}"
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:umicom-os>"
+                "-DCASE=${_case}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/report-compare/${_case}/$<CONFIG>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_report_comparison.cmake")
+        set_tests_properties("os.boot_report_compare_cli.${_case}" PROPERTIES
+            TIMEOUT 15 LABELS "os;boot-report;cli")
+    endforeach()
+endif()
