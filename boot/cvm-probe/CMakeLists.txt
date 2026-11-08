@@ -22,6 +22,9 @@ set(UMICOM_C_SOURCE_DIR "" CACHE PATH "Umicom C checkout used to build a target-
 if(NOT EXISTS "${UMICOM_C_SOURCE_DIR}/cmake/UmicomCRuntime.cmake")
     message(FATAL_ERROR "Set UMICOM_C_SOURCE_DIR to the Umicom C source checkout")
 endif()
+if(NOT EXISTS "${UMICOM_C_SOURCE_DIR}/include/umicom_c/trace.h")
+    message(FATAL_ERROR "Select an Umicom C source checkout containing the caller-owned trace API")
+endif()
 include("${UMICOM_C_SOURCE_DIR}/cmake/UmicomCRuntime.cmake")
 umicom_c_add_runtime(umicom_os_cvm_runtime)
 add_executable(umicom-cvm-probe main.c)
@@ -44,3 +47,15 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
         PASS_REGULAR_EXPRESSION "UMICOM_CVM_PROBE_READY value=42")
 endif()
 install(TARGETS umicom-cvm-probe RUNTIME DESTINATION usr/libexec)
+
+# Keep native process evidence separate from cross compilation and image boot.
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+    # Keep the earlier process list for review; cross builds still register no launches.
+    # foreach(case IN ITEMS ordinary-output trace-output invalid-option extra-argument)
+    foreach(case IN ITEMS ordinary-output trace-output invalid-option extra-argument comparison-output comparison-extra)
+        add_test(NAME "os.cvm.probe.${case}"
+            COMMAND "${CMAKE_COMMAND}" "-DTOOL=$<TARGET_FILE:umicom-cvm-probe>" "-DCASE=${case}"
+                -P "${CMAKE_CURRENT_LIST_DIR}/check_process.cmake")
+        set_tests_properties("os.cvm.probe.${case}" PROPERTIES TIMEOUT 15 LABELS "os;cvm;native;trace")
+    endforeach()
+endif()
