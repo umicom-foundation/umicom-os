@@ -83,3 +83,22 @@ Native source snapshots and image metadata use their own strict `.umi` format;
 archives describe the same diskless guest. A verified archive is not a boot pass.
 
 The user-space GTK desktop composes Framework’s branded titlebar and searchable application catalogue. Its native launch activity shows process starts and exits; this is separate from bootable-image readiness. See [Opening applications and checking launch activity](framework/docs/learning/application-launch-activity.html).
+
+## Installed Framework SDK for OS user space
+
+The source-based commands above remain the default. An independent OS user-space
+build can instead select a qualified installed SDK without compiling its
+`framework/` submodule. This does not build or install a kernel, root filesystem
+or boot image. Use a separate build directory and matching toolchain.
+
+```powershell
+cmake -S . -B build/sdk-debug -G Ninja -DUMICOM_OS_USE_INSTALLED_FRAMEWORK=ON -DUMICOM_SDK_ROOT=C:/SDKs/Umicom -DUMICOM_OS_GUI=OFF -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/sdk-debug
+ctest --test-dir build/sdk-debug --output-on-failure
+```
+
+Stop on errors. The optional GUI requires installed `ui_gtk4`,
+`desktop_workspace_gtk4` and `desktop_system_gtk4` components and current consumer
+helpers. Consult `share/umicom/framework/docs/learning/sdk-product-composition.html`
+in the SDK for the walkthrough and deployment limits. Configuration, linking,
+execution and operating-system boot qualification are separate results.

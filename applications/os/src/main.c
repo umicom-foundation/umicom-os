@@ -22,6 +22,9 @@
 #include <string.h>
 #include "umicom/platform/boot_report_file.h"
 #include "umicom/platform/native_arguments.h"
+#if defined(UMICOM_OS_HAS_BOOT_REPORT_JSON)
+#include "umicom/platform/boot_report_json.h"
+#endif
 
 #include "umicom/os/application.h"
 #include "umicom/os/services.h"
@@ -68,6 +71,8 @@ static int Usage(void)
     fputs("Usage: umicom-os [--help]\n"
           "       umicom-os --boot-report ABSOLUTE_FILE [--source SHA256]\n"
           "       umicom-os --compare-boot-reports EARLIER_ABSOLUTE_FILE LATER_ABSOLUTE_FILE\n"
+          "       umicom-os --boot-report-json ABSOLUTE_FILE [--source SHA256]\n"
+          "       umicom-os --compare-boot-reports-json EARLIER_ABSOLUTE_FILE LATER_ABSOLUTE_FILE\n"
           "Inspect a captured report. No guest, service or privileged operation is started.\n",
           stdout);
     return ferror(stdout) || fflush(stdout) ? 1 : 0;
@@ -133,8 +138,50 @@ static int CompareReports(const char *beforePath, const char *afterPath)
     return ferror(stdout) || fflush(stdout) ? 1 : 0;
 }
 
+
+/* Framework owns schema and validation. The console owns only argument
+ * routing and stdout. Older Framework selections retain existing text modes
+ * and refuse JSON explicitly rather than running startup or copying a parser. */
+static int InspectJson(const char *beforePath, const char *afterPath, const char *source)
+{
+#if defined(UMICOM_OS_HAS_BOOT_REPORT_JSON)
+    UmiBootReport before, after;
+    UmiStatus status = UmiBootReportLoad(beforePath, source, &before);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot read selected boot report for JSON (status=%d).\n", (int)status);
+        return 1;
+    }
+    if (afterPath) {
+        status = UmiBootReportLoad(afterPath, NULL, &after);
+        if (status != UMI_STATUS_OK) {
+            fprintf(stderr, "Cannot read later boot report for JSON (status=%d).\n", (int)status);
+            return 1;
+        }
+    }
+    char json[UMI_BOOT_REPORT_JSON_CAPACITY]; size_t length = 0U;
+    status = afterPath ? UmiBootReportComparisonJson(&before, &after, json, sizeof json, &length) :
+        UmiBootReportJson(&before, json, sizeof json, &length);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot format captured boot JSON (status=%d).\n", (int)status);
+        return 1;
+    }
+    if (fwrite(json, 1U, length, stdout) != length || fputc('\n', stdout) == EOF) return 1;
+    return fflush(stdout) == 0 ? 0 : 1;
+#else
+    (void)beforePath; (void)afterPath; (void)source;
+    fputs("Boot-report JSON is unavailable in the selected Framework. Select an SDK with boot_report_tools.\n", stderr);
+    return 1;
+#endif
+}
+
 static int CommandMain(int argc, char **argv)
 {
+    if (argc == 4 && !strcmp(argv[1], "--compare-boot-reports-json"))
+        return InspectJson(argv[2], argv[3], NULL);
+    if ((argc == 3 || argc == 5) && !strcmp(argv[1], "--boot-report-json")) {
+        if (argc == 5 && strcmp(argv[3], "--source")) return 2;
+        return InspectJson(argv[2], NULL, argc == 5 ? argv[4] : NULL);
+    }
     if (argc == 4 && !strcmp(argv[1], "--compare-boot-reports"))
         return CompareReports(argv[2], argv[3]);
     if (argc == 1) return RunStartup();

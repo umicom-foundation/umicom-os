@@ -5,9 +5,12 @@
 # PURPOSE:
 #   Build the user-space Umicom OS application as a normal Framework consumer.
 #
-# Created by: Sammy Hegab
-# Organisation: Umicom Foundation
-# Licence: MIT
+# AUTHOR AND ORGANISATION:
+# Sammy Hegab
+# Umicom Foundation
+#
+# LICENCE:
+# MIT
 #-----------------------------------------------------------------------------
 set(UMICOM_OS_CORE_SOURCES
     src/application.c src/desktop.c src/launcher.c src/settings.c
@@ -27,9 +30,25 @@ if(UMICOM_OS_GUI)
     endif()
     # The shell composes the shared tools through a reusable target, allowing
     # native lifetime checks to exercise exactly the same implementation.
+    # Former unconditional producer include retained for dependency review.
+    if(FALSE)
     foreach(_tool IN ITEMS DesktopWorkspace DesktopSystem)
         include("${PROJECT_SOURCE_DIR}/framework/cmake/Umicom${_tool}Gtk4.cmake")
     endforeach()
+    endif()
+    # An installed GTK component is already built. Include producer modules
+    # only in source mode, preserving the original shell and lifetime tests.
+    if(UMICOM_OS_USE_INSTALLED_FRAMEWORK)
+        foreach(_target Umicom::desktop_workspace_gtk4 Umicom::desktop_system_gtk4)
+            if(NOT TARGET ${_target})
+                message(FATAL_ERROR "Selected OS SDK lacks ${_target}")
+            endif()
+        endforeach()
+    else()
+        foreach(_tool IN ITEMS DesktopWorkspace DesktopSystem)
+            include("${PROJECT_SOURCE_DIR}/framework/cmake/Umicom${_tool}Gtk4.cmake")
+        endforeach()
+    endif()
     add_library(umicom_os_desktop_shell STATIC src/gtk4/desktop_shell.c)
     target_link_libraries(umicom_os_desktop_shell PUBLIC umicom_os_core
         Umicom::desktop_workspace_gtk4 Umicom::desktop_system_gtk4)
@@ -115,5 +134,37 @@ if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_report_comparison.cmake")
         set_tests_properties("os.boot_report_compare_cli.${_case}" PROPERTIES
             TIMEOUT 15 LABELS "os;boot-report;cli")
+    endforeach()
+endif()
+
+# Keep source checkouts with older Framework versions usable. Consumers that
+# require structured output can make the capability a configuration contract.
+option(UMICOM_OS_REQUIRE_BOOT_REPORT_JSON "Require structured captured boot-report output" OFF)
+set(_umicom_os_boot_json_available OFF)
+if(TARGET Umicom::boot_report_tools)
+    if(UMICOM_OS_USE_INSTALLED_FRAMEWORK)
+        # Retain the unpublished variable spelling for review. The root project
+        # declares UMICOM_SDK_ROOT; validate this component against that same prefix.
+        if(FALSE)
+        umicom_require_installed_sdk("${UMICOM_OS_FRAMEWORK_SDK_ROOT}" Umicom::boot_report_tools)
+        endif()
+        umicom_require_installed_sdk("${UMICOM_SDK_ROOT}" Umicom::boot_report_tools)
+    endif()
+    target_link_libraries(umicom-os PRIVATE Umicom::boot_report_tools)
+    target_compile_definitions(umicom-os PRIVATE UMICOM_OS_HAS_BOOT_REPORT_JSON=1)
+    set(_umicom_os_boot_json_available ON)
+elseif(UMICOM_OS_REQUIRE_BOOT_REPORT_JSON)
+    message(FATAL_ERROR "Selected Framework lacks Umicom::boot_report_tools required by UMICOM_OS_REQUIRE_BOOT_REPORT_JSON")
+endif()
+message(STATUS "Umicom OS captured boot JSON available: ${_umicom_os_boot_json_available}")
+if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
+    foreach(_case inspect matching mismatch compare source unicode malformed missing-argument bad-option)
+        add_test(NAME os.boot_report_json_cli.${_case}
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:umicom-os>"
+                "-DCASE=${_case}" "-DAVAILABLE=${_umicom_os_boot_json_available}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/boot-json/${_case}/$<CONFIG>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_report_json.cmake")
+        set_tests_properties(os.boot_report_json_cli.${_case} PROPERTIES
+            TIMEOUT 15 LABELS "os;boot-report;json;cli")
     endforeach()
 endif()
