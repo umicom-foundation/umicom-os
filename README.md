@@ -102,3 +102,7 @@ Stop on errors. The optional GUI requires installed `ui_gtk4`,
 helpers. Consult `share/umicom/framework/docs/learning/sdk-product-composition.html`
 in the SDK for the walkthrough and deployment limits. Configuration, linking,
 execution and operating-system boot qualification are separate results.
+
+## Native local website preview
+
+[Umicom OS Web Preview](tools/web-preview/README.md) is a thin native console that uses the shared Framework web service and an explicitly selected installed SDK or reviewed source checkout. It preserves Unicode arguments, serves static files on loopback, and supports a syntax-only dry-run. This is a user-space development tool; Internet hosting and freestanding Kernel sockets remain separate work.
