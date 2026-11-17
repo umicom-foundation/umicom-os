@@ -1,3 +1,5 @@
+![Umicom](../../framework/resources/brand/umicom-logo.svg)
+
 # Umicom C preview and the OS boot path
 
 Umicom OS has two distinct activities: building native user-space tools and booting a Linux-based guest image. Running a tool on Windows does not boot Umicom OS.
@@ -70,3 +72,22 @@ Stop on errors and retain the exact process output. A native build registers exa
 The source requires `UMC_COMPARISON_PROFILE`. Select matching Umicom C headers and runtime, rebuild, and retain the actual process results. Do not infer guest startup or hardware support from a host pass. A Linux-targeted static executable, root-filesystem inclusion and an actual guest launch remain separate checks.
 
 The hosted Framework preview wrapper inherits comparison source and trace behaviour from the shared primary Framework project when that revision and the matching installed Umicom C SDK are selected. It still does not duplicate the parser. Its comparison consumer checks are separate from the fixed runtime-only probe described here.
+
+
+## Shared source stepping
+
+The optional preview consumer now also supports **--steps**. Its machine and lifecycle belong to Framework and the canonical Umicom C SDK; the OS does not duplicate the interpreter.
+
+A Framework dependency without **include/umicom/toolchain/cvm_debug.h** is rejected during configuration. After updating the dependency, or selecting the primary Framework checkout explicitly, configure the small project:
+
+~~~powershell
+Set-Location "C:/umicom/umicomOS"
+cmake -S tools/cvm-preview -B build/cvm-preview-debug -G Ninja -DCMAKE_C_COMPILER=gcc -DUMICOM_OS_FRAMEWORK_SOURCE=C:/umicom/Umicom-Applications/framework -DUMICOM_C_PREVIEW_SOURCE=C:/umicom/umicom-c -DBUILD_TESTING=ON
+cmake --build build/cvm-preview-debug --parallel 2
+ctest --test-dir build/cvm-preview-debug --output-on-failure --no-tests=error
+& "./build/cvm-preview-debug/framework-preview/umicom-cvm-preview.exe" --steps "int main(void){return 6*7;}"
+~~~
+
+Run commands separately and stop on errors. Successful execution prints source locations followed by 42. The OS-specific shared-step test also exercises a runtime fault and refusal of invalid source. Configuration success alone does not prove these tests pass.
+
+This is a hosted developer tool. It does not insert an interpreter into PID 1, turn the Windows executable into a Linux binary, or modify a boot image. The existing fixed boot probe and Kernel guest remain separate qualification routes.
