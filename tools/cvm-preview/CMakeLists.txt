@@ -40,3 +40,16 @@ if(BUILD_TESTING)
         -P "${CMAKE_CURRENT_LIST_DIR}/check_shared_steps.cmake")
     set_tests_properties(os.cvm.shared-step-consumer PROPERTIES TIMEOUT 20 LABELS "os;cvm;sdk;debugger")
 endif()
+
+# No product-local executor: require and exercise the shared slice service.
+file(STRINGS "${_framework}/include/umicom/toolchain/cvm_debug.h"
+    _slice_api REGEX "UmcStatus umi_cvm_debug_resume")
+if(NOT _slice_api)
+    message(FATAL_ERROR "Update the selected Framework source to the bounded CVM resume API.")
+endif()
+if(BUILD_TESTING)
+    add_test(NAME os.cvm.shared-slice-consumer COMMAND "${CMAKE_COMMAND}"
+        "-DTOOL=$<TARGET_FILE:umicom-cvm-preview>"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_shared_slices.cmake")
+    set_tests_properties(os.cvm.shared-slice-consumer PROPERTIES TIMEOUT 15 LABELS "os;cvm;sdk;slices")
+endif()

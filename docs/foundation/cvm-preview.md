@@ -91,3 +91,18 @@ ctest --test-dir build/cvm-preview-debug --output-on-failure --no-tests=error
 Run commands separately and stop on errors. Successful execution prints source locations followed by 42. The OS-specific shared-step test also exercises a runtime fault and refusal of invalid source. Configuration success alone does not prove these tests pass.
 
 This is a hosted developer tool. It does not insert an interpreter into PID 1, turn the Windows executable into a Linux binary, or modify a boot image. The existing fixed boot probe and Kernel guest remain separate qualification routes.
+
+
+## Bounded execution through the shared service
+
+The optional preview supports **--slice N** with an instruction allowance from 1 through 256. Framework delegates each slice to the canonical Umicom C machine. The OS wrapper adds no execution engine.
+
+~~~powershell
+& "./build/cvm-preview-debug/framework-preview/umicom-cvm-preview.exe" --slice 2 "int main(void){return 6*7;}"
+~~~
+
+The expected report for this example is **slices=2 instructions=4 value=42**. A runtime fault produces a diagnostic and an unsuccessful exit, not a completed value. The console runs slices one after another; scheduling them in a graphical event loop remains separate work.
+
+Configuration rejects a selected Framework checkout without the bounded resume declaration. Select a reviewed primary Framework source through UMICOM_OS_FRAMEWORK_SOURCE, or update the OS dependency through the normal Git workflow after publishing the shared source. Do not mix a new Umicom C header with an older SDK library.
+
+The registered **os.cvm.shared-slice-consumer** check exercises the shared command and invalid-budget refusal. Configuration alone does not execute this check or establish a successful OS launch.
