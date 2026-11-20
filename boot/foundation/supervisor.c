@@ -34,7 +34,13 @@ typedef struct LaunchError { int stage; int number; } LaunchError;
 static uint64_t Now(void)
 {
     struct timespec now;
+    /* Retain the combined check for review. A failed system call owns errno;
+     * an impossible clock value needs an explicit error for its caller. */
+#if 0
     if (clock_gettime(CLOCK_MONOTONIC, &now) != 0 || now.tv_sec < 0) return UINT64_MAX;
+#endif
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) return UINT64_MAX;
+    if (now.tv_sec < 0) { errno = EIO; return UINT64_MAX; }
     return (uint64_t)now.tv_sec * UINT64_C(1000) + (uint64_t)now.tv_nsec / UINT64_C(1000000);
 }
 static void ChildFail(int fd, int stage)
@@ -144,6 +150,23 @@ static int OwnWritableLog(int descriptor)
     return fcntl(descriptor, F_DUPFD_CLOEXEC, 3);
 }
 
+/* An empty EOF means that no launch error was reported. A short record or
+ * failed read cannot establish that fact and must block a successful result. */
+static int ReadLaunchError(int descriptor, LaunchError *error)
+{
+    char *bytes = (char *)error;
+    size_t received = 0;
+    while (received < sizeof *error) {
+        ssize_t count = read(descriptor, bytes + received, sizeof *error - received);
+        if (count < 0 && errno == EINTR) continue;
+        if (count < 0) return errno;
+        if (count == 0) return received == 0 ? 0 : EPROTO;
+        received += (size_t)count;
+    }
+    if ((error->stage != 1 && error->stage != 2) || error->number <= 0) return EPROTO;
+    return 0;
+}
+
 /* The prior launch path is retained for review. The active implementation
  * owns private descriptors and requires exclusive child-wait ownership before
  * launch, preserving error reporting and safe process-group cleanup. */
@@ -241,6 +264,10 @@ UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool 
     (void)close(ownedLog);
     (void)close(pipeFd[1]);
     (void)setpgid(pid, pid); /* The child checks its own result before exec. */
+    /* Preserve the original observation and classification for review. It
+     * conflated a failed clock with timeout and treated a failed pipe read
+     * as absent launch evidence. The replacement keeps those errors distinct. */
+#if 0
     result.launchError = 0;
     bool timedOut = false, waitFailed = false;
     for (;;) {
@@ -285,6 +312,65 @@ UmiOsServiceResult UmiOsServiceRun(const UmiOsService *service, int logFd, bool 
         result.state = error.stage == 2 ? UMI_OS_SERVICE_PRIVILEGE : UMI_OS_SERVICE_LAUNCH;
     } else if (WIFEXITED(waitStatus) && WEXITSTATUS(waitStatus) == 0) result.state = UMI_OS_SERVICE_OK;
     else result.state = UMI_OS_SERVICE_EXIT;
+#endif
+    bool timedOut = false;
+    bool ownsChild = true;
+    int supervisionError = 0;
+    for (;;) {
+        siginfo_t information = {0};
+        if (waitid(P_PID, (id_t)pid, &information, WEXITED | WNOHANG | WNOWAIT) != 0) {
+            if (errno == EINTR) continue;
+            supervisionError = errno;
+            ownsChild = false;
+            break;
+        }
+        if (information.si_pid == pid) break;
+
+        /* Timeout requires a valid monotonic observation. Check again after
+         * an interrupted sleep so signals cannot defer the actual deadline. */
+        uint64_t now = Now();
+        if (now == UINT64_MAX || now < start) {
+            supervisionError = now == UINT64_MAX ? errno : EIO;
+            break;
+        }
+        uint64_t elapsed = now - start;
+        if (elapsed >= service->timeoutMs) {
+            timedOut = true;
+            break;
+        }
+        uint64_t remaining = service->timeoutMs - elapsed;
+        struct timespec delay = {0, remaining < 10U ? (long)remaining * 1000000L : 10000000L};
+        if (nanosleep(&delay, NULL) != 0 && errno != EINTR) {
+            supervisionError = errno;
+            break;
+        }
+    }
+
+    /* A clock or sleep error still permits cleanup while the supervisor owns
+     * the unreaped child. A failed observation no longer proves ownership. */
+    pid_t waited = -1;
+    if (ownsChild) {
+        (void)kill(-pid, SIGKILL);
+        (void)kill(pid, SIGKILL);
+        do { waited = waitpid(pid, &waitStatus, 0); } while (waited < 0 && errno == EINTR);
+        if (waited != pid && supervisionError == 0) supervisionError = waited < 0 ? errno : ECHILD;
+    }
+
+    /* Interpret launch evidence only after successful cleanup. Machine errors
+     * take precedence over an elapsed deadline and over a child's exit code. */
+    LaunchError error = {0};
+    if (supervisionError == 0 && !timedOut) supervisionError = ReadLaunchError(pipeFd[0], &error);
+    (void)close(pipeFd[0]);
+    uint64_t end = Now();
+    result.elapsedMs = end != UINT64_MAX && end >= start ? end - start : 0U;
+    result.launchError = supervisionError != 0 ? supervisionError : error.number;
+    if (supervisionError != 0) result.state = UMI_OS_SERVICE_LAUNCH;
+    else if (timedOut) result.state = UMI_OS_SERVICE_TIMEOUT;
+    else if (error.stage != 0) result.state = error.stage == 2 ? UMI_OS_SERVICE_PRIVILEGE : UMI_OS_SERVICE_LAUNCH;
+    else if (WIFEXITED(waitStatus) && WEXITSTATUS(waitStatus) == 0) result.state = UMI_OS_SERVICE_OK;
+    else result.state = UMI_OS_SERVICE_EXIT;
+    /* Preserve the actual direct-child status whenever it could be observed,
+     * including when a separate supervisor error determines the outcome. */
     if (waited == pid) {
         if (WIFEXITED(waitStatus)) result.exitCode = WEXITSTATUS(waitStatus);
         if (WIFSIGNALED(waitStatus)) result.signalNumber = WTERMSIG(waitStatus);

@@ -90,6 +90,24 @@ if(BUILD_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPI
     endforeach()
 endif()
 
+# These Linux host fixtures use GNU-style link wrapping to inject failures at
+# the supervisor boundary. The production target and guest image are unchanged.
+if(BUILD_TESTING AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_CROSSCOMPILING
+        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    add_executable(umicom-os-supervisor-evidence-tests ../../tests/foundation/test_supervisor_evidence.c)
+    target_link_libraries(umicom-os-supervisor-evidence-tests PRIVATE umicom_os_supervisor)
+    add_dependencies(umicom-os-supervisor-evidence-tests umicom-os-test-child)
+    target_link_options(umicom-os-supervisor-evidence-tests PRIVATE
+        "LINKER:--wrap=clock_gettime" "LINKER:--wrap=nanosleep" "LINKER:--wrap=read" "LINKER:--wrap=waitpid")
+    foreach(_evidence_case IN ITEMS clock-start clock-poll clock-backwards sleep-error sleep-interrupt
+            pipe-error pipe-interrupt pipe-short wait-reap)
+        add_test(NAME "os.foundation.supervisor_evidence.${_evidence_case}"
+            COMMAND umicom-os-supervisor-evidence-tests "${_evidence_case}" "$<TARGET_FILE:umicom-os-test-child>")
+        set_tests_properties("os.foundation.supervisor_evidence.${_evidence_case}" PROPERTIES
+            TIMEOUT 15 LABELS "os;foundation;supervisor;regression")
+    endforeach()
+endif()
+
 # Cross-repository protocol check is optional and belongs to the host suite,
 # not the independent recovery binary. Pass the current Framework source root.
 set(UMICOM_OS_FRAMEWORK_SOURCE "" CACHE PATH "Framework source for the host boot-report contract check")

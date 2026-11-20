@@ -18,6 +18,7 @@
 #include "boot_diagnostic.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +72,13 @@ static void PrintReport(const char *mode, const char *state, size_t planned, siz
     printf("UMICOM_REPORT_BEGIN\nUMICOM_BOOT_REPORT 1\nmode=%s\nstate=%s\nplanned=%zu\ncompleted=%zu\nreason=%s\nsource=%s\nUMICOM_REPORT_END\n",
         mode, state, planned, completed, reason, source);
     fflush(stdout);
+}
+/* Keep fault details in the guest console without changing boot-report v1
+ * or requiring recovery to link another product's reporting code. */
+static void PrintServiceDiagnostic(const UmiOsService *service, int error, uint64_t elapsedMs)
+{
+    fprintf(stderr, "UMICOM_SERVICE_DIAGNOSTIC id=%s errno=%d elapsed_ms=%" PRIu64 "\n",
+        service->id, error, elapsedMs);
 }
 int main(void)
 {
@@ -161,12 +169,30 @@ int main(void)
             int count = snprintf(logPath, sizeof logPath, "/run/umicom/logs/%.31s.log", service->id);
             int logFd = count > 0 && (size_t)count < sizeof logPath
                 ? open(logPath, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600) : -1;
+            /* Keep the original recovery-only branch for review. Publish the
+             * actual error before taking the same transition to recovery. */
+#if 0
             if (logFd < 0) { reason = "service-launch"; state = "recovery"; break; }
+#endif
+            if (logFd < 0) {
+                int error = count > 0 && (size_t)count < sizeof logPath ? errno : EOVERFLOW;
+                PrintServiceDiagnostic(service, error, 0);
+                reason = "service-launch"; state = "recovery"; break;
+            }
             printf("UMICOM_SERVICE start=%s\n", service->id);
             UmiOsServiceResult result = UmiOsServiceRun(service, logFd, true);
+            /* Preserve the earlier classification for review. The active
+             * branch also keeps the error from the caller-owned log close. */
+#if 0
             if (close(logFd) != 0 && result.state == UMI_OS_SERVICE_OK) result.state = UMI_OS_SERVICE_LAUNCH;
+#endif
+            if (close(logFd) != 0 && result.state == UMI_OS_SERVICE_OK) {
+                result.launchError = errno;
+                result.state = UMI_OS_SERVICE_LAUNCH;
+            }
             printf("UMICOM_SERVICE end=%s outcome=%s exit=%d signal=%d\n", service->id,
                 UmiOsServiceReason(result.state), result.exitCode, result.signalNumber);
+            if (result.launchError != 0) PrintServiceDiagnostic(service, result.launchError, result.elapsedMs);
             if (result.state != UMI_OS_SERVICE_OK) { reason = UmiOsServiceReason(result.state); state = "recovery"; break; }
             ++completed;
             if (!UmiOsWriteReport("/run/umicom/boot.report", mode, state, config.count, completed, reason, source)) {

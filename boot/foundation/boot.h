@@ -50,7 +50,10 @@ typedef struct UmiOsServiceResult {
     UmiOsServiceState state;
     int exitCode;
     int signalNumber;
+    /* A Linux errno identifies launch, observation or cleanup failure. It is
+     * zero for a normal exit or an elapsed deadline with confirmed cleanup. */
     int launchError;
+    /* Zero when a valid monotonic elapsed sample is unavailable. */
     uint64_t elapsedMs;
 } UmiOsServiceResult;
 
