@@ -1,5 +1,9 @@
 # Qualify the OS in separate layers
 
+![Umicom](../../framework/resources/brand/umicom-logo.svg)
+
+[Umicom application icon](../../framework/resources/brand/umicom.ico)
+
 The OS repository contains two different builds. The root CMake project checks
 Framework-backed user-space applications. `boot/foundation` builds the independent
 PID1, configuration parser, service supervisor and recovery console. A successful
@@ -80,6 +84,30 @@ guest or require administrative rights. Malformed, oversized or mismatching inpu
 returns failure without printing an accepted report. A well-formed report may
 still describe a failed boot; successful inspection is not successful booting.
 A captured report is not proof of current system health or publisher identity.
+
+### Verify a report copy by its exact bytes
+
+1. When you first review a captured report, record the bytes' SHA-256 using
+   `Get-FileHash -Algorithm SHA256` in PowerShell or `sha256sum` on Linux.
+   Keep that value with your reviewed evidence. Store it as 64 lowercase
+   hexadecimal characters.
+2. When reviewing a copy, pass the saved value in `$reviewedCaptureSha256`.
+   If you also recorded the source manifest identity, add `--source` and its
+   lowercase SHA-256 value.
+
+```powershell
+& "C:\umicom\installed\os\bin\umicom-os.exe" --boot-report-identity `
+    "C:\umicom\_local\os-evidence\boot.report" --capture $reviewedCaptureSha256
+```
+
+3. Confirm the displayed `capture`, `source`, `bytes` and recorded `state`.
+   The `capture` value covers the complete file. A change to the field order
+   changes that value even if the recorded fields still compare equal.
+4. A process exit code of 2 indicates malformed command options. Exit code 1
+   with `status=2` means one of the supplied identities did not match. Retrieve
+   the reviewed capture before updating saved evidence. An older Framework
+   package may report that capture identity is unavailable. Its existing report
+   readers remain available until the selected SDK includes the feature.
 
 ## Check the packaged service environment
 

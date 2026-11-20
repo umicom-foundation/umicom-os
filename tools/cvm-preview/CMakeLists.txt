@@ -53,3 +53,27 @@ if(BUILD_TESTING)
         -P "${CMAKE_CURRENT_LIST_DIR}/check_shared_slices.cmake")
     set_tests_properties(os.cvm.shared-slice-consumer PROPERTIES TIMEOUT 15 LABELS "os;cvm;sdk;slices")
 endif()
+
+# A selected hosted compiler creates the wire fixture at test time. Match it
+# to the SDK used by the Framework consumer and leave source checks available
+# when only an older preview-capable dependency is selected.
+set(UMICOM_OS_CVM_ARTIFACT_COMPILER "" CACHE FILEPATH
+    "Absolute path to the matching hosted umicom-c tool for the artifact contract")
+if(BUILD_TESTING AND UMICOM_OS_CVM_ARTIFACT_COMPILER)
+    if(NOT IS_ABSOLUTE "${UMICOM_OS_CVM_ARTIFACT_COMPILER}" OR
+       NOT EXISTS "${UMICOM_OS_CVM_ARTIFACT_COMPILER}" OR
+       IS_DIRECTORY "${UMICOM_OS_CVM_ARTIFACT_COMPILER}")
+        message(FATAL_ERROR "Select an existing absolute hosted umicom-c executable for artifact checks.")
+    endif()
+    file(STRINGS "${_framework}/include/umicom/toolchain/cvm_preview.h"
+        _artifact_api REGEX "UmiStatus umi_cvm_preview_bytecode")
+    if(NOT _artifact_api)
+        message(FATAL_ERROR "The selected Framework preview lacks the shared bytecode API.")
+    endif()
+    add_test(NAME os.cvm.shared-artifact-consumer COMMAND "${CMAKE_COMMAND}"
+        "-DCOMPILER=${UMICOM_OS_CVM_ARTIFACT_COMPILER}"
+        "-DTOOL=$<TARGET_FILE:umicom-cvm-preview>"
+        "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/artifact-contract"
+        -P "${CMAKE_CURRENT_LIST_DIR}/check_shared_artifact.cmake")
+    set_tests_properties(os.cvm.shared-artifact-consumer PROPERTIES TIMEOUT 30 LABELS "os;cvm;sdk;bytecode")
+endif()

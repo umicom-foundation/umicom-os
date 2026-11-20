@@ -70,6 +70,7 @@ static int Usage(void)
 {
     fputs("Usage: umicom-os [--help]\n"
           "       umicom-os --boot-report ABSOLUTE_FILE [--source SHA256]\n"
+          "       umicom-os --boot-report-identity ABSOLUTE_FILE [--source SHA256] [--capture SHA256]\n"
           "       umicom-os --compare-boot-reports EARLIER_ABSOLUTE_FILE LATER_ABSOLUTE_FILE\n"
           "       umicom-os --boot-report-json ABSOLUTE_FILE [--source SHA256]\n"
           "       umicom-os --compare-boot-reports-json EARLIER_ABSOLUTE_FILE LATER_ABSOLUTE_FILE\n"
@@ -94,6 +95,40 @@ static int InspectReport(const char *path, const char *source)
         report.reason, report.sourceId);
     puts("This file is an observation, not proof of current machine health or publisher identity.");
     return ferror(stdout) || fflush(stdout) ? 1 : 0;
+}
+
+static int InspectIdentity(int argc, char **argv)
+{
+    const char *source = NULL, *capture = NULL;
+    /* Admission is independent of the selected Framework. Refuse incomplete,
+     * repeated or unknown flags before reading the selected local file. */
+    if (argc < 3 || argc > 7 || argc % 2 == 0) return 2;
+    for (int index = 3; index < argc; index += 2) {
+        if (!strcmp(argv[index], "--source") && source == NULL) source = argv[index + 1];
+        else if (!strcmp(argv[index], "--capture") && capture == NULL) capture = argv[index + 1];
+        else return 2;
+    }
+#if defined(UMI_BOOT_REPORT_HAS_CAPTURE_IDENTITY)
+    /* Framework parses, checks and hashes one native read. This branch only
+     * presents its result and never enters the application startup route. */
+    UmiBootReportCapture captured;
+    UmiStatus status = UmiBootReportInspectFile(argv[2], source, capture, &captured);
+    if (status != UMI_STATUS_OK) {
+        fprintf(stderr, "Cannot confirm captured boot report identity (status=%d). "
+            "Check the selected file and both expected identities.\n", (int)status);
+        return 1;
+    }
+    printf("Captured boot report identity\nsource=%s\ncapture=%s\nbytes=%zu\nstate=%s\n",
+        captured.report.sourceId, captured.captureSha256, captured.byteCount,
+        UmiBootReportStateText(captured.report.state));
+    puts("This file is an observation, not proof of current machine health or publisher identity.");
+    return ferror(stdout) || fflush(stdout) ? 1 : 0;
+#else
+    /* Allow older dependency checkouts to keep their established read and
+     * startup commands until the primary Framework is published and aligned. */
+    fputs("The selected Framework lacks capture identity.\n", stderr);
+    return 1;
+#endif
 }
 
 /* Keep admission and comparison in Framework. This frontend formats observed
@@ -176,6 +211,8 @@ static int InspectJson(const char *beforePath, const char *afterPath, const char
 
 static int CommandMain(int argc, char **argv)
 {
+    /* Exact capture inspection is always explicit, including missing-file usage. */
+    if (argc >= 2 && !strcmp(argv[1], "--boot-report-identity")) return InspectIdentity(argc, argv);
     if (argc == 4 && !strcmp(argv[1], "--compare-boot-reports-json"))
         return InspectJson(argv[2], argv[3], NULL);
     if ((argc == 3 || argc == 5) && !strcmp(argv[1], "--boot-report-json")) {

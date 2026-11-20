@@ -1,5 +1,7 @@
 # Build an image with the native Umicom tools
 
+<img src="../../framework/resources/brand/umicom-logo.svg" alt="Umicom" width="180">
+
 The primary host tool is now the C23 `umicom-os-image` executable supplied by Framework. The older `tools/os_image.py` is retained unchanged as an alternative. Their preparation manifests are different; start with a new native workspace instead of mixing their output directories.
 
 Read the shared public lesson: [Build and check a small Umicom OS image](../../framework/docs/learning/build-and-check-umicom-os.html).
@@ -37,3 +39,21 @@ inputs; a declaration digest and an input-manifest digest have different meaning
 
 The public Framework API is in `umicom/os_image/profile.h`. Host applications
 can inspect the same grammar without duplicating the parser used by preparation.
+
+## Observe the selected RISC-V firmware
+
+1. Record the OpenSBI package, its version and the path of the file supplied for
+   QEMU's RISC-V `virt` machine. Select the file using the package's published
+   provenance or your release record.
+2. Enter the absolute path and inspect the bytes with the native tool.
+
+   ```bash
+   read -r -p 'Absolute firmware path: ' FIRMWARE
+   "$BUILD/bin/umicom-os-image" firmware-info --file "$FIRMWARE"
+   ```
+
+   The output starts with `UMICOM_OS_FIRMWARE_INFO 1` and records `sha256` and
+   `bytes`. Keep those observations with the package and QEMU identities.
+3. Compare both values to the independently recorded pin before running a
+   guest. The [pinned firmware lesson](../../framework/docs/learning/pinned-os-firmware.html)
+   shows the explicit check and separate normal and recovery calls.

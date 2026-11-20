@@ -106,3 +106,26 @@ The expected report for this example is **slices=2 instructions=4 value=42**. A 
 Configuration rejects a selected Framework checkout without the bounded resume declaration. Select a reviewed primary Framework source through UMICOM_OS_FRAMEWORK_SOURCE, or update the OS dependency through the normal Git workflow after publishing the shared source. Do not mix a new Umicom C header with an older SDK library.
 
 The registered **os.cvm.shared-slice-consumer** check exercises the shared command and invalid-budget refusal. Configuration alone does not execute this check or establish a successful OS launch.
+
+## Verify a compiled artifact
+
+The hosted preview can consume the bytecode produced by a matching Umicom C
+compiler. Use a Framework checkout exposing `umi_cvm_preview_bytecode`.
+Assuming the hosted compiler is already built at the path in the command
+below, run these steps from the Umicom OS directory.
+
+```powershell
+cmake -S tools/cvm-preview -B build/cvm-artifact -G Ninja -DUMICOM_OS_FRAMEWORK_SOURCE=C:/umicom/Umicom-Applications/framework -DUMICOM_C_PREVIEW_SOURCE=C:/umicom/umicom-c -DUMICOM_OS_CVM_ARTIFACT_COMPILER=C:/umicom/umicom-c/build/bin/umicom-c.exe -DBUILD_TESTING=ON
+cmake --build build/cvm-artifact --parallel 2
+ctest --test-dir build/cvm-artifact --output-on-failure --no-tests=error -R '^os[.]cvm[.]shared-artifact-consumer$'
+```
+
+Replace the compiler path with the actual native executable on your machine.
+The test writes an invented source file in the build directory, compiles a new
+artifact, expects the preview to print `42`, and checks that the artifact
+stays unchanged. A deliberately truncated file must fail without producing
+a value. If configuration reports a missing bytecode API, select the Framework
+source that matches your SDK and configure again.
+
+This checks the hosted tool and the artifacts it accepts. Guest execution
+requires separate target and boot evidence.

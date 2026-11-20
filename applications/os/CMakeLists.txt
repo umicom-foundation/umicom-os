@@ -124,6 +124,21 @@ if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
     endforeach()
 endif()
 
+# The older Framework checkout remains usable. Only the explicitly unavailable
+# route is skipped; syntax checks retain ordinary results on every SDK.
+if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
+    foreach(_case IN ITEMS plain match reverse-flags report-changed wrong-source bad-sha missing-value duplicate unknown unicode)
+        add_test(NAME "os.boot_report_identity_cli.${_case}"
+            COMMAND "${CMAKE_COMMAND}" "-DPROGRAM=$<TARGET_FILE:umicom-os>"
+                "-DCASE=${_case}"
+                "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/boot-report-identity/${_case}/$<CONFIG>"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_boot_report_identity.cmake")
+        set_tests_properties("os.boot_report_identity_cli.${_case}" PROPERTIES
+            TIMEOUT 15 LABELS "os;boot-report;identity;cli"
+            SKIP_REGULAR_EXPRESSION "Selected Framework has no capture identity API")
+    endforeach()
+endif()
+
 # Report comparison reuses Framework admission and never starts the OS shell.
 if(UMICOM_OS_BUILD_TESTS AND BUILD_TESTING)
     foreach(_case IN ITEMS equal unicode progress source invalid-before invalid-after missing-argument)
